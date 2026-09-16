@@ -230,6 +230,27 @@ label.field > select, label.field > input { color: var(--text); font-size: 14px;
 .file-chip .name { font-weight: 550; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .file-chip .spacer { flex: 1; }
 
+/* ---------- one sheet within a side ---------- */
+
+.source {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+.source-head {
+  display: flex; align-items: baseline; gap: 10px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.source-head .spacer { flex: 1; }
+.source-title { font-weight: 600; font-size: 14px; }
+.source-body { padding: 14px 12px; }
+/* Only the unselected half needs lifting off the card; overriding every
+   button here would beat the selected-state rule and paint its white label
+   on a white background. */
+.source-body .seg button:not([aria-pressed='true']) { background: var(--surface); }
+.source-body select, .source-body input { background: var(--surface); }
+
 /* ---------- verdict ---------- */
 
 .verdict {

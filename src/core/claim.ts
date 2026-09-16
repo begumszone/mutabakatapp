@@ -54,6 +54,28 @@ export function suggestPerspective(entries: StatementEntry[]): Perspective {
   return net >= 0 ? 'receivable' : 'payable';
 }
 
+/**
+ * Rewrites entries so that a later `claimOf(entry, 'receivable')` gives the
+ * same answer the original perspective would have.
+ *
+ * This exists so that a side assembled from several sheets can be merged at
+ * all. Two tabs of the same customer card can be written from opposite sides
+ * — a Logo export of "our supplier" next to a SAP extract of "their
+ * customer" — and a merged ledger can only carry one perspective. Orienting
+ * each source as it is read, rather than at the end, means the merge is a
+ * plain concatenation and every downstream step sees one direction.
+ *
+ * A payable line is mirrored by swapping borç and alacak, which is exactly
+ * what the two ledgers do to each other in the first place.
+ */
+export function orientEntries(
+  entries: StatementEntry[],
+  perspective: Perspective,
+): StatementEntry[] {
+  if (perspective === 'receivable') return entries;
+  return entries.map((entry) => ({ ...entry, debit: entry.credit, credit: entry.debit }));
+}
+
 /** Earliest and latest dates present in a statement, or null when empty. */
 export function dateRange(entries: StatementEntry[]): { start: string; end: string } | null {
   if (entries.length === 0) return null;

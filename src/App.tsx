@@ -2,57 +2,133 @@ import { useMemo, useState } from 'react';
 import type {
   ColumnMapping,
   Locale,
+  PairReconciliation,
   ParsedFile,
   ParsedWorkbook,
-  PairReconciliation,
   Party,
   Perspective,
   ReconciliationSettings,
+  StatementEntry,
 } from './types';
 import { translate } from './lib/i18n';
 import { sampleFiles } from './lib/sampleData';
 import { FileParseError, parseWorkbook, sheetToParsedFile } from './adapters/parseFile';
 import { suggestMapping, validateMapping } from './adapters/suggestMapping';
 import { buildStatement, makeStatement, type BuildResult } from './adapters/buildStatement';
+import { orientEntries } from './core/claim';
 import { reconcilePair } from './core/reconcilePair';
 import { todayIso } from './core/parseDate';
 import { useTheme } from './hooks/useTheme';
 import { FileDrop } from './components/FileDrop';
-import { SideSetup } from './components/SideSetup';
+import { SideSetup, type SourceView } from './components/SideSetup';
 import { ResultView } from './components/ResultView';
 
 type Step = 'upload' | 'map' | 'result';
 
-/** Everything the app knows about one of the two sides. */
-interface Side {
+/**
+ * One sheet contributing to a side's ledger.
+ *
+ * A side is a list of these rather than a single sheet, because real customer
+ * cards arrive split — lira on one tab and euro on another, or one file per
+ * date range. Each keeps its own mapping and orientation, since two tabs of
+ * the same export genuinely can be shaped differently.
+ */
+interface Source {
+  id: string;
   workbook: ParsedWorkbook | null;
-  /** Set directly for sample data, derived from the workbook otherwise. */
+  /** Set directly for the sample data, derived from the workbook otherwise. */
   directFile: ParsedFile | null;
   sheetIndex: number;
   headerRow: number;
-  mapping: ColumnMapping | null;
-  perspective: Perspective | null;
-  partyName: string;
+  mapping: ColumnMapping;
+  perspective: Perspective;
 }
 
-const EMPTY_SIDE: Side = {
-  workbook: null,
-  directFile: null,
-  sheetIndex: 0,
-  headerRow: 0,
-  mapping: null,
-  perspective: null,
-  partyName: '',
-};
+interface Side {
+  partyName: string;
+  sources: Source[];
+}
 
-function fileOf(side: Side): ParsedFile | null {
-  if (side.directFile) return side.directFile;
-  if (!side.workbook) return null;
+const EMPTY_SIDE: Side = { partyName: '', sources: [] };
+
+let nextSourceId = 0;
+
+function fileOf(source: Source): ParsedFile | null {
+  if (source.directFile) return source.directFile;
+  if (!source.workbook) return null;
   try {
-    return sheetToParsedFile(side.workbook, side.sheetIndex, side.headerRow);
+    return sheetToParsedFile(source.workbook, source.sheetIndex, source.headerRow);
   } catch {
     return null;
   }
+}
+
+/** Builds a source with its mapping and orientation guessed from the data. */
+function makeSource(
+  workbook: ParsedWorkbook | null,
+  directFile: ParsedFile | null,
+  sheetIndex: number,
+  headerRow: number,
+  perspective?: Perspective,
+): Source | null {
+  const base: Source = {
+    id: `s${nextSourceId++}`,
+    workbook,
+    directFile,
+    sheetIndex,
+    headerRow,
+    mapping: {
+      date: null, dueDate: null, docNo: null, docNoAlt: null, docTypeColumn: null,
+      description: null, amountLayout: 'debitCredit', debit: null, credit: null,
+      amount: null, currency: null,
+    },
+    perspective: perspective ?? 'receivable',
+  };
+  const parsed = fileOf(base);
+  if (!parsed) return null;
+  const mapping = suggestMapping(parsed);
+  const build = buildStatement(parsed, mapping);
+  return { ...base, mapping, perspective: perspective ?? build.suggestedPerspective };
+}
+
+interface SideBuild {
+  views: SourceView[];
+  entries: StatementEntry[];
+}
+
+/**
+ * Reads every source of one side into a single ledger.
+ *
+ * Entry ids are namespaced by source, so two sheets that both start at row 1
+ * cannot collide — an id collision here would silently drop a line from the
+ * balance or tie an action to the wrong row.
+ */
+function buildSide(side: Side): SideBuild {
+  const views: SourceView[] = [];
+  const entries: StatementEntry[] = [];
+
+  for (const source of side.sources) {
+    const parsed = fileOf(source);
+    if (!parsed) continue;
+    const build: BuildResult = buildStatement(parsed, source.mapping);
+    views.push({
+      id: source.id,
+      workbook: source.workbook,
+      parsed,
+      sheetIndex: source.sheetIndex,
+      headerRow: source.headerRow,
+      mapping: source.mapping,
+      perspective: source.perspective,
+      build,
+    });
+    // Oriented here, so the merged ledger carries one direction even when two
+    // sheets of the same side were written from opposite ones.
+    for (const entry of orientEntries(build.entries, source.perspective)) {
+      entries.push({ ...entry, id: `${source.id}:${entry.id}` });
+    }
+  }
+
+  return { views, entries };
 }
 
 export function App() {
@@ -77,43 +153,21 @@ export function App() {
   const t = (key: string, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
 
-  const creditorFile = fileOf(creditorSide);
-  const debtorFile = fileOf(debtorSide);
+  const creditorBuild = useMemo(() => buildSide(creditorSide), [creditorSide]);
+  const debtorBuild = useMemo(() => buildSide(debtorSide), [debtorSide]);
 
-  // Mapping and orientation are recomputed whenever the sheet underneath them
-  // changes, but only where the user has not already overridden them.
-  const creditorBuild: BuildResult | null = useMemo(
-    () =>
-      creditorFile && creditorSide.mapping
-        ? buildStatement(creditorFile, creditorSide.mapping)
-        : null,
-    [creditorFile, creditorSide.mapping],
-  );
-  const debtorBuild: BuildResult | null = useMemo(
-    () => (debtorFile && debtorSide.mapping ? buildStatement(debtorFile, debtorSide.mapping) : null),
-    [debtorFile, debtorSide.mapping],
-  );
-
-  const loadFile = async (file: File, which: 'creditor' | 'debtor') => {
+  const addFile = async (file: File, which: 'creditor' | 'debtor', replace: boolean) => {
     setError(null);
     try {
       const workbook = await parseWorkbook(file);
-      const sheetIndex = 0;
       const headerRow = workbook.sheets[0].suggestedHeaderRow;
-      const parsed = sheetToParsedFile(workbook, sheetIndex, headerRow);
-      const mapping = suggestMapping(parsed);
-      const build = buildStatement(parsed, mapping);
-      const next: Side = {
-        workbook,
-        directFile: null,
-        sheetIndex,
-        headerRow,
-        mapping,
-        perspective: build.suggestedPerspective,
-        partyName: file.name.replace(/\.[^.]+$/, ''),
-      };
-      if (which === 'creditor') setCreditorSide(next);
-      else setDebtorSide(next);
+      const source = makeSource(workbook, null, 0, headerRow);
+      if (!source) throw new FileParseError(file.name);
+      const setSide = which === 'creditor' ? setCreditorSide : setDebtorSide;
+      setSide((side) => ({
+        partyName: replace || !side.partyName ? file.name.replace(/\.[^.]+$/, '') : side.partyName,
+        sources: replace ? [source] : [...side.sources, source],
+      }));
     } catch (caught) {
       setError(caught instanceof FileParseError ? caught.message : String(caught));
     }
@@ -121,48 +175,94 @@ export function App() {
 
   const loadSample = () => {
     const { creditor, debtor } = sampleFiles();
-    const make = (parsed: ParsedFile, name: string, perspective: Perspective): Side => {
-      const mapping = suggestMapping(parsed);
-      return {
-        workbook: null,
-        directFile: parsed,
-        sheetIndex: 0,
-        headerRow: 0,
-        mapping,
-        perspective,
-        partyName: name,
-      };
+    const one = (parsed: ParsedFile, name: string, perspective: Perspective): Side => {
+      const source = makeSource(null, parsed, 0, 0, perspective);
+      return { partyName: name, sources: source ? [source] : [] };
     };
-    setCreditorSide(make(creditor, 'ABC Limited', 'receivable'));
-    setDebtorSide(make(debtor, 'Begüm Teknoloji', 'payable'));
+    setCreditorSide(one(creditor, 'ABC Limited', 'receivable'));
+    setDebtorSide(one(debtor, 'Begüm Teknoloji', 'payable'));
     setSettings((current) => ({ ...current, asOfDate: '2026-06-30' }));
     setStep('map');
   };
 
-  /** Re-reads a side after the user changes its sheet or header row. */
-  const reread = (side: Side, changes: Partial<Side>): Side => {
-    const next = { ...side, ...changes };
-    if (!next.workbook) return next;
-    try {
-      const parsed = sheetToParsedFile(next.workbook, next.sheetIndex, next.headerRow);
-      const mapping = suggestMapping(parsed);
-      const build = buildStatement(parsed, mapping);
-      return { ...next, mapping, perspective: build.suggestedPerspective };
-    } catch {
-      return next;
-    }
+  /** Applies a change to one source, re-guessing when the sheet moves under it. */
+  const updateSource = (
+    which: 'creditor' | 'debtor',
+    sourceId: string,
+    change: (source: Source) => Source,
+  ) => {
+    const setSide = which === 'creditor' ? setCreditorSide : setDebtorSide;
+    setSide((side) => ({
+      ...side,
+      sources: side.sources.map((source) => (source.id === sourceId ? change(source) : source)),
+    }));
   };
 
-  const canRun =
-    creditorFile !== null &&
-    debtorFile !== null &&
-    creditorSide.mapping !== null &&
-    debtorSide.mapping !== null &&
-    validateMapping(creditorSide.mapping).every((issue) => issue.severity !== 'error') &&
-    validateMapping(debtorSide.mapping).every((issue) => issue.severity !== 'error');
+  /** A different sheet is a different table, so its mapping is guessed afresh. */
+  const reguess = (source: Source, changes: Partial<Source>): Source => {
+    const next = { ...source, ...changes };
+    const parsed = fileOf(next);
+    if (!parsed) return next;
+    const mapping = suggestMapping(parsed);
+    const build = buildStatement(parsed, mapping);
+    return { ...next, mapping, perspective: build.suggestedPerspective };
+  };
+
+  const sideProps = (which: 'creditor' | 'debtor') => {
+    const side = which === 'creditor' ? creditorSide : debtorSide;
+    const setSide = which === 'creditor' ? setCreditorSide : setDebtorSide;
+    const build = which === 'creditor' ? creditorBuild : debtorBuild;
+    return {
+      locale,
+      title: t(`upload.${which}`),
+      hint: t(`upload.${which}Hint`),
+      partyName: side.partyName,
+      onPartyName: (name: string) => setSide((s) => ({ ...s, partyName: name })),
+      sources: build.views,
+      totalEntries: build.entries.length,
+      onSheetIndex: (id: string, index: number) =>
+        updateSource(which, id, (source) =>
+          reguess(source, {
+            sheetIndex: index,
+            headerRow: source.workbook?.sheets[index]?.suggestedHeaderRow ?? 0,
+          }),
+        ),
+      onHeaderRow: (id: string, index: number) =>
+        updateSource(which, id, (source) => reguess(source, { headerRow: index })),
+      onMapping: (id: string, mapping: ColumnMapping) =>
+        updateSource(which, id, (source) => ({ ...source, mapping })),
+      onPerspective: (id: string, perspective: Perspective) =>
+        updateSource(which, id, (source) => ({ ...source, perspective })),
+      onRemoveSource: (id: string) =>
+        setSide((s) => ({ ...s, sources: s.sources.filter((source) => source.id !== id) })),
+      onAddSheet: (id: string, sheetIndex: number) =>
+        setSide((s) => {
+          const template = s.sources.find((source) => source.id === id);
+          if (!template?.workbook) return s;
+          const added = makeSource(
+            template.workbook,
+            null,
+            sheetIndex,
+            template.workbook.sheets[sheetIndex]?.suggestedHeaderRow ?? 0,
+          );
+          return added ? { ...s, sources: [...s.sources, added] } : s;
+        }),
+      onAddFile: (file: File) => void addFile(file, which, false),
+    };
+  };
+
+  const hasBoth = creditorBuild.views.length > 0 && debtorBuild.views.length > 0;
+
+  const mappingsUsable = (side: Side) =>
+    side.sources.length > 0 &&
+    side.sources.every((source) =>
+      validateMapping(source.mapping).every((issue) => issue.severity !== 'error'),
+    );
+
+  const canRun = hasBoth && mappingsUsable(creditorSide) && mappingsUsable(debtorSide);
 
   const run = () => {
-    if (!creditorFile || !debtorFile || !creditorBuild || !debtorBuild) return;
+    if (!canRun) return;
     const creditor: Party = {
       id: 'creditor',
       name: creditorSide.partyName || t('common.creditor'),
@@ -173,22 +273,36 @@ export function App() {
       name: debtorSide.partyName || t('common.debtor'),
       taxId: null,
     };
+
+    // Every source was oriented as it was read, so both merged ledgers are
+    // already expressed as "the debtor owes the creditor". Applying a
+    // perspective again here would undo that and double the reported gap.
+    const label = (build: SideBuild): ParsedFile => ({
+      fileName: build.views
+        .map((view) => `${view.parsed.fileName} — ${view.parsed.sheetName}`)
+        .join(' + '),
+      sheetName: '',
+      headers: [],
+      rows: [],
+    });
+
     const creditorStatement = makeStatement(
       'creditor',
-      creditorFile,
+      label(creditorBuild),
       creditorBuild.entries,
       creditor.id,
       debtor.id,
-      creditorSide.perspective ?? creditorBuild.suggestedPerspective,
+      'receivable',
     );
     const debtorStatement = makeStatement(
       'debtor',
-      debtorFile,
+      label(debtorBuild),
       debtorBuild.entries,
       debtor.id,
       creditor.id,
-      debtorSide.perspective ?? debtorBuild.suggestedPerspective,
+      'receivable',
     );
+
     setResult(reconcilePair(creditor, debtor, creditorStatement, debtorStatement, settings));
     setStep('result');
   };
@@ -254,34 +368,37 @@ export function App() {
             </div>
 
             <div className="grid-2">
-              {(
-                [
-                  ['creditor', creditorSide, setCreditorSide],
-                  ['debtor', debtorSide, setDebtorSide],
-                ] as const
-              ).map(([which, side, setSide]) => (
-                <section className="card" key={which}>
-                  <div className="card-head">
-                    <h2>{t(`upload.${which}`)}</h2>
-                  </div>
-                  <div className="card-body stack">
-                    <p className="faint">{t(`upload.${which}Hint`)}</p>
-                    <FileDrop
-                      locale={locale}
-                      fileName={side.workbook?.fileName ?? side.directFile?.fileName ?? null}
-                      onFile={(file) => void loadFile(file, which)}
-                      onClear={() => setSide(EMPTY_SIDE)}
-                    />
-                  </div>
-                </section>
-              ))}
+              {(['creditor', 'debtor'] as const).map((which) => {
+                const side = which === 'creditor' ? creditorSide : debtorSide;
+                const setSide = which === 'creditor' ? setCreditorSide : setDebtorSide;
+                const first = side.sources[0];
+                const name = first
+                  ? (first.workbook?.fileName ?? first.directFile?.fileName ?? null)
+                  : null;
+                return (
+                  <section className="card" key={which}>
+                    <div className="card-head">
+                      <h2>{t(`upload.${which}`)}</h2>
+                    </div>
+                    <div className="card-body stack">
+                      <p className="faint">{t(`upload.${which}Hint`)}</p>
+                      <FileDrop
+                        locale={locale}
+                        fileName={name}
+                        onFile={(file) => void addFile(file, which, true)}
+                        onClear={() => setSide(EMPTY_SIDE)}
+                      />
+                    </div>
+                  </section>
+                );
+              })}
             </div>
 
             <div className="row">
               <button
                 className="primary"
                 type="button"
-                disabled={!creditorFile || !debtorFile}
+                disabled={!hasBoth}
                 onClick={() => setStep('map')}
               >
                 {t('upload.continue')}
@@ -289,54 +406,16 @@ export function App() {
               <button className="ghost" type="button" onClick={loadSample}>
                 {t('upload.sample')}
               </button>
-              {(!creditorFile || !debtorFile) && (
-                <span className="faint">{t('upload.bothNeeded')}</span>
-              )}
+              {!hasBoth && <span className="faint">{t('upload.bothNeeded')}</span>}
             </div>
           </div>
         )}
 
-        {step === 'map' && creditorFile && debtorFile && creditorSide.mapping && debtorSide.mapping && creditorBuild && debtorBuild && (
+        {step === 'map' && hasBoth && (
           <div className="stack">
             <div className="grid-2">
-              <SideSetup
-                locale={locale}
-                title={t('upload.creditor')}
-                partyName={creditorSide.partyName}
-                onPartyName={(name) => setCreditorSide((s) => ({ ...s, partyName: name }))}
-                workbook={creditorSide.workbook}
-                parsed={creditorFile}
-                sheetIndex={creditorSide.sheetIndex}
-                onSheetIndex={(index) =>
-                  setCreditorSide((s) => reread(s, { sheetIndex: index, headerRow: s.workbook?.sheets[index]?.suggestedHeaderRow ?? 0 }))
-                }
-                headerRow={creditorSide.headerRow}
-                onHeaderRow={(index) => setCreditorSide((s) => reread(s, { headerRow: index }))}
-                mapping={creditorSide.mapping}
-                onMapping={(mapping) => setCreditorSide((s) => ({ ...s, mapping }))}
-                perspective={creditorSide.perspective ?? creditorBuild.suggestedPerspective}
-                onPerspective={(perspective) => setCreditorSide((s) => ({ ...s, perspective }))}
-                build={creditorBuild}
-              />
-              <SideSetup
-                locale={locale}
-                title={t('upload.debtor')}
-                partyName={debtorSide.partyName}
-                onPartyName={(name) => setDebtorSide((s) => ({ ...s, partyName: name }))}
-                workbook={debtorSide.workbook}
-                parsed={debtorFile}
-                sheetIndex={debtorSide.sheetIndex}
-                onSheetIndex={(index) =>
-                  setDebtorSide((s) => reread(s, { sheetIndex: index, headerRow: s.workbook?.sheets[index]?.suggestedHeaderRow ?? 0 }))
-                }
-                headerRow={debtorSide.headerRow}
-                onHeaderRow={(index) => setDebtorSide((s) => reread(s, { headerRow: index }))}
-                mapping={debtorSide.mapping}
-                onMapping={(mapping) => setDebtorSide((s) => ({ ...s, mapping }))}
-                perspective={debtorSide.perspective ?? debtorBuild.suggestedPerspective}
-                onPerspective={(perspective) => setDebtorSide((s) => ({ ...s, perspective }))}
-                build={debtorBuild}
-              />
+              <SideSetup {...sideProps('creditor')} />
+              <SideSetup {...sideProps('debtor')} />
             </div>
 
             <section className="card">
@@ -398,10 +477,7 @@ export function App() {
                     type="checkbox"
                     checked={settings.allowDateAmountFallback}
                     onChange={(event) =>
-                      setSettings((s) => ({
-                        ...s,
-                        allowDateAmountFallback: event.target.checked,
-                      }))
+                      setSettings((s) => ({ ...s, allowDateAmountFallback: event.target.checked }))
                     }
                   />
                   {t('settings.fallback')}

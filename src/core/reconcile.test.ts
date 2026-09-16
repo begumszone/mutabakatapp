@@ -3,6 +3,7 @@ import type { Party, ReconciliationSettings, Statement, StatementEntry } from '.
 import { normalizeDocNo, normalizeDocNoLoose } from './normalize';
 import { parseAmount } from './parseNumber';
 import { parseDate } from './parseDate';
+import { claimOf, orientEntries, statementBalance } from './claim';
 import { reconcilePair } from './reconcilePair';
 import { matchStatements } from './matchEntries';
 
@@ -76,6 +77,26 @@ describe('parsing helpers', () => {
     expect(normalizeDocNoLoose('AL72026000000017')).toBe(normalizeDocNoLoose('AL7202600000017'));
     // ...without dragging a genuinely different series along with it.
     expect(normalizeDocNoLoose('AL12026000000017')).not.toBe(normalizeDocNoLoose('AL7202600000017'));
+  });
+});
+
+describe('merging several sheets into one side', () => {
+  it('leaves a receivable sheet alone and mirrors a payable one', () => {
+    const invoice = entry('e1', '2026-01-05', 'F1', 0, 1000);
+    const [mirrored] = orientEntries([invoice], 'payable');
+    // The claim has to survive the rewrite: the point of mirroring is that
+    // the merged ledger reads in one direction, not that the numbers change.
+    expect(claimOf(mirrored, 'receivable')).toBe(claimOf(invoice, 'payable'));
+    expect(orientEntries([invoice], 'receivable')[0]).toBe(invoice);
+  });
+
+  it('adds up a side whose two sheets were written from opposite directions', () => {
+    // A lira tab kept as a receivable card, and a euro tab kept as a payable
+    // one — the split this app exists to cope with.
+    const lira = orientEntries([entry('a1', '2026-01-05', 'F1', 1000, 0)], 'receivable');
+    const euro = orientEntries([entry('a2', '2026-02-05', 'F2', 0, 250)], 'payable');
+    const merged = statement('a', 'receivable', [...lira, ...euro]);
+    expect(statementBalance(merged)).toBe(1250);
   });
 });
 
