@@ -5,6 +5,7 @@ dist-ssr
 .DS_Store
 .vite
 coverage
+*.tsbuildinfo
 
 # Real customer exports used as local test fixtures. Never committed:
 # sharing a counterparty's ledger is the account owner's decision, not the

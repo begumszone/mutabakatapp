@@ -43,6 +43,35 @@ Gerçek ekstreler birbirini tutmaz, çünkü:
   ile "ABBOTT 53,12'den, KONSENSUS 54,50'den çevirmiş" arasındaki mesafe,
   mutabakatın çözülmesiyle çözülmemesi arasındaki mesafedir.
 
+## Açık kalem modu
+
+SAP tarzı bir ekstre aslında bir **açık kalem listesi + kapanmış hareket
+geçmişidir**. Raporladığı bakiye, kapanış (clearing / "Denkleştirme")
+belgesi boş olan satırların toplamıdır; geri kalanı ERP'nin çoktan
+kapattığı faturalardır — üstelik bu faturaların bir kısmı ekstre
+başlamadan önce kesilmiştir. Bu yüzden ekstrenin tamamı kendi bakiyesini
+vermez. Gerçek bir dosyada: açık kalemler **501.717,37**, bütün satırlar
+ise **30.467,42**.
+
+Ekstre hangi satırlarının kapandığını söylüyorsa, kapanmış belgeler
+karşılaştırmadan çıkarılır. Karşı tarafın ekstresinde genelde kapanış
+kolonu yoktur; bu yüzden karar **eşleştirmenin kendisiyle** karşıya
+taşınır: bu taraf "X faturası kapandı" diyorsa, öbür taraftaki X faturası
+da kapanmıştır. Bu çıkarım olmasa, müşterinin geçmişte kaydettiği her
+belge "tedarikçide eksik kayıt" olarak geri gelirdi.
+
+Eşleştirme her zaman **önce tüm satırlar üzerinde** çalışır: daraltmayı
+önce yapmak, daraltmayı doğru kılan bağlantıları atmak olurdu.
+
+Devir satırları da dışarıda bırakılır. Devir zaten kapanmış geçmişin tek
+rakama inmiş hâlidir; içeride bırakmak az önce çıkarılanı iki kez saymak
+olur. Devir, sonucun kendi satırında raporlanır — iki tarafın devri
+tutmuyorsa, daha eski dönemi kapsayan bir ekstre istemek gerekir.
+
+Mod, kapanış kolonu varsa kendiliğinden açılır, yoksa kapalı kalır; bu
+okumayı desteklemeyen bir yükleme hiçbir zaman sessizce yeniden
+yorumlanmaz.
+
 ## Eşleştirme nasıl çalışır
 
 Kanıtı güçlüden zayıfa doğru kullanan katmanlı bir eşleştirme yapılır ve
@@ -57,6 +86,12 @@ her katman yalnızca öncekilerden artanı görür:
 4. seri sonu aynı;
 5. tarih + tutar aynı — referansı olmayan tahsilatlar için;
 6. yalnız tutar, üstelik iki tarafta da tek aday varsa.
+
+Belge numarasının eşleştirmeye girebilmesi için yeterince uzun olması
+gerekir. Logo fişlerini `0000000000000001` diye numaralandırır; dolgu
+sıfırları atılınca geriye "1" kalır ve iki firmanın da bir 1 numaralı fişi
+vardır. Kısa numaralar kanıt taşımadığı için o satır tarih ve tutar
+adımlarına düşer.
 
 Son iki adım tahmindir; kapatılabilirler ve eşleşen her satır hangi
 adımdan geldiğini gösterir.
