@@ -5,18 +5,36 @@ import { detectHeaderRowIndex, type Cell } from './detectHeaderRow';
 
 export class FileParseError extends Error {}
 
+/**
+ * Flattens whatever ExcelJS hands back for one cell into a plain value.
+ *
+ * A cell can arrive as a date, rich text, a formula with a cached result, or
+ * a hyperlink. The shapes that are not recognised must become blank rather
+ * than be stringified: `String(someObject)` yields "[object Object]", which
+ * then travels through the app as if it were a company name or an account
+ * code, and reads as data the file never contained.
+ */
 function normalizeCell(value: unknown): Cell {
   if (value === null || value === undefined) return null;
   if (typeof value === 'object') {
-    // Rich text, formula results, or dates
     if (value instanceof Date) return value.toISOString().slice(0, 10);
-    const asAny = value as { text?: string; result?: unknown; richText?: { text: string }[] };
-    if (asAny.richText) return asAny.richText.map((r) => r.text).join('');
-    if (typeof asAny.result === 'number' || typeof asAny.result === 'string') return asAny.result;
-    if (typeof asAny.text === 'string') return asAny.text;
-    return String(value);
+    const cell = value as {
+      text?: unknown;
+      result?: unknown;
+      richText?: { text: string }[];
+      hyperlink?: string;
+      error?: string;
+    };
+    if (Array.isArray(cell.richText)) return cell.richText.map((part) => part.text).join('');
+    if (typeof cell.result === 'number' || typeof cell.result === 'string') return cell.result;
+    if (typeof cell.text === 'string') return cell.text;
+    // A formula that errored, a hyperlink with no label, or a shape we do not
+    // know: the honest answer is that this cell holds nothing readable.
+    return null;
   }
-  return value as Cell;
+  if (typeof value === 'string' || typeof value === 'number') return value;
+  if (typeof value === 'boolean') return String(value);
+  return null;
 }
 
 /** Gives every column a usable, unique name -- blank headers become "Column D" rather than "". */
