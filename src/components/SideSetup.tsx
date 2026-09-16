@@ -188,6 +188,11 @@ function SourceCard({
           {build.skippedFooter > 0 && (
             <span>{t('mapping.skippedFooter', { count: build.skippedFooter })}</span>
           )}
+          {build.zeroAmount > 0 && (
+            <span className={build.zeroAmount > build.entries.length / 2 ? 'neg' : undefined}>
+              {t('mapping.zeroAmount', { count: build.zeroAmount })}
+            </span>
+          )}
         </div>
 
         {issues.map((issue) => (

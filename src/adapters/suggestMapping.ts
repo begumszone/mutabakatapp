@@ -59,6 +59,7 @@ const FIELDS: Record<string, FieldSpec> = {
       { needle: 'belge no', score: 9 },
       { needle: 'invoice no', score: 9 },
       { needle: 'document number', score: 6 },
+      { needle: 'fatura', score: 5 },
       { needle: 'fis', score: 4 },
       { needle: 'evrak', score: 4 },
     ],
@@ -87,7 +88,7 @@ const FIELDS: Record<string, FieldSpec> = {
       { needle: 'borc', score: 8 },
       { needle: 'debit', score: 8 },
     ],
-    exclude: ['bak', 'balance', 'toplam'],
+    exclude: ['bak', 'bakiye', 'balance', 'toplam'],
   },
   credit: {
     candidates: [
@@ -97,7 +98,7 @@ const FIELDS: Record<string, FieldSpec> = {
       { needle: 'alac', score: 7 },
       { needle: 'credit', score: 8 },
     ],
-    exclude: ['bak', 'balance', 'toplam'],
+    exclude: ['bak', 'bakiye', 'balance', 'toplam'],
   },
   amount: {
     candidates: [
@@ -107,11 +108,13 @@ const FIELDS: Record<string, FieldSpec> = {
       { needle: 'tutar', score: 6 },
       { needle: 'amount', score: 6 },
     ],
-    exclude: ['bak', 'balance', 'bakiye', 'toplam'],
+    exclude: ['bak', 'bakiye', 'balance', 'toplam'],
   },
   clearingDoc: {
     candidates: [
       { needle: 'clearing document', score: 10 },
+      { needle: 'denklestirme belgesi', score: 10 },
+      { needle: 'denklestirme', score: 9 },
       { needle: 'kapanis belgesi', score: 10 },
       { needle: 'kapatma belgesi', score: 10 },
       { needle: 'clearing doc', score: 9 },
@@ -132,9 +135,21 @@ const FIELDS: Record<string, FieldSpec> = {
   },
 };
 
+/**
+ * Exclusions match whole words, not substrings.
+ *
+ * "Tür" is a disqualifying word for a document-number column — "Evrak Türü"
+ * is a type, not a number. As a substring it also sits inside "Fatura", which
+ * is exactly the column we want. Anchoring to word boundaries keeps the rule
+ * doing what it was written to do.
+ */
+function containsWord(haystack: string, word: string): boolean {
+  return new RegExp(`(^| )${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( |$)`).test(haystack);
+}
+
 function scoreHeader(header: string, spec: FieldSpec): number {
-  const folded = foldText(header).replace(/[._]/g, ' ').replace(/\s+/g, ' ');
-  if (spec.exclude?.some((bad) => folded.includes(bad))) return 0;
+  const folded = foldText(header).replace(/[._]/g, ' ').replace(/\s+/g, ' ').trim();
+  if (spec.exclude?.some((bad) => containsWord(folded, bad))) return 0;
   let best = 0;
   for (const candidate of spec.candidates) {
     if (folded.includes(candidate.needle)) best = Math.max(best, candidate.score);
@@ -142,12 +157,21 @@ function scoreHeader(header: string, spec: FieldSpec): number {
   return best;
 }
 
-/** Ranks every header for one field, best first, dropping non-matches. */
+/**
+ * Ranks every header for one field, best first, dropping non-matches.
+ *
+ * Ties are broken by how much header is left over once the matched wording is
+ * accounted for. A SAP export carries both "Referans" and "Referans anahtar",
+ * and they score identically on the word they share — but "Referans" holds the
+ * invoice number the counterparty also books, while "Referans anahtar" is a
+ * composite key that matches nothing on the other side. The shorter header is
+ * the more exact answer, so it wins.
+ */
 function rank(headers: string[], spec: FieldSpec): string[] {
   return headers
-    .map((header) => ({ header, score: scoreHeader(header, spec) }))
+    .map((header) => ({ header, score: scoreHeader(header, spec), length: foldText(header).length }))
     .filter((item) => item.score > 0)
-    .sort((a, b) => b.score - a.score)
+    .sort((a, b) => b.score - a.score || a.length - b.length)
     .map((item) => item.header);
 }
 

@@ -84,7 +84,7 @@ describe('parsing helpers', () => {
 
 describe('merging several sheets into one side', () => {
   it('leaves a receivable sheet alone and mirrors a payable one', () => {
-    const invoice = entry('e1', '2026-01-05', 'F1', 0, 1000);
+    const invoice = entry('e1', '2026-01-05', 'FTR2026000101', 0, 1000);
     const [mirrored] = orientEntries([invoice], 'payable');
     // The claim has to survive the rewrite: the point of mirroring is that
     // the merged ledger reads in one direction, not that the numbers change.
@@ -95,8 +95,8 @@ describe('merging several sheets into one side', () => {
   it('adds up a side whose two sheets were written from opposite directions', () => {
     // A lira tab kept as a receivable card, and a euro tab kept as a payable
     // one — the split this app exists to cope with.
-    const lira = orientEntries([entry('a1', '2026-01-05', 'F1', 1000, 0)], 'receivable');
-    const euro = orientEntries([entry('a2', '2026-02-05', 'F2', 0, 250)], 'payable');
+    const lira = orientEntries([entry('a1', '2026-01-05', 'FTR2026000101', 1000, 0)], 'receivable');
+    const euro = orientEntries([entry('a2', '2026-02-05', 'FTR2026000102', 0, 250)], 'payable');
     const merged = statement('a', 'receivable', [...lira, ...euro]);
     expect(statementBalance(merged)).toBe(1250);
   });
@@ -129,6 +129,23 @@ describe('matching', () => {
     const result = matchStatements(creditor, debtor, settings);
     expect(result.pairs).toHaveLength(1);
     expect(result.pairs[0].basis).toBe('dateAndAmount');
+  });
+
+  it('will not match on an internal fiş number that padding reduced to a digit', () => {
+    // A Logo export numbers its fişler 0000000000000001 upwards. Squeezing the
+    // padding leaves "1", and both firms have a fiş 1 that is not the same
+    // document — so the number carries no evidence and the line has to stand
+    // on its date and amount instead.
+    const creditor = statement('a', 'receivable', [
+      entry('c1', '2026-01-05', '0000000000000001', 1000, 0),
+    ]);
+    const debtor = statement('b', 'payable', [
+      entry('d1', '2026-09-20', '0000000000000001', 0, 7250),
+    ]);
+    const result = matchStatements(creditor, debtor, settings);
+    expect(result.pairs).toHaveLength(0);
+    expect(result.creditorOnly).toHaveLength(1);
+    expect(result.debtorOnly).toHaveLength(1);
   });
 
   it('refuses to guess when the same amount appears twice on a side', () => {
@@ -183,16 +200,16 @@ describe('the balance bridge', () => {
 
   it('keeps the bridge balanced however the differences are spread', () => {
     const creditor = statement('a', 'receivable', [
-      entry('c1', '2026-01-05', 'F1', 1000, 0),
-      entry('c2', '2026-01-06', 'F2', 2000, 0),
-      entry('c3', '2026-02-01', 'F3', 3000, 0),
+      entry('c1', '2026-01-05', 'FTR2026000101', 1000, 0),
+      entry('c2', '2026-01-06', 'FTR2026000102', 2000, 0),
+      entry('c3', '2026-02-01', 'FTR2026000103', 3000, 0),
       entry('c4', '2026-02-10', '', 0, 1500),
     ]);
     const debtor = statement('b', 'payable', [
-      entry('d1', '2026-01-05', 'F1', 0, 1100),
-      entry('d2', '2026-01-06', 'F2', 0, 2000),
+      entry('d1', '2026-01-05', 'FTR2026000101', 0, 1100),
+      entry('d2', '2026-01-06', 'FTR2026000102', 0, 2000),
       entry('d4', '2026-02-10', 'BN3', 1500, 0),
-      entry('d5', '2026-02-12', 'F9', 0, 700),
+      entry('d5', '2026-02-12', 'FTR2026000109', 0, 700),
     ]);
     const { bridge } = reconcilePair(abc, begum, creditor, debtor, settings);
     expect(bridge.reconciles).toBe(true);
@@ -238,8 +255,8 @@ describe('naming the cause of a difference', () => {
   });
 
   it('recognises a gap that is exactly the VAT', () => {
-    const creditor = statement('a', 'receivable', [entry('c1', '2026-05-29', 'F1', 12000, 0)]);
-    const debtor = statement('b', 'payable', [entry('d1', '2026-05-29', 'F1', 0, 10000)]);
+    const creditor = statement('a', 'receivable', [entry('c1', '2026-05-29', 'FTR2026000101', 12000, 0)]);
+    const debtor = statement('b', 'payable', [entry('d1', '2026-05-29', 'FTR2026000101', 0, 10000)]);
     const result = reconcilePair(abc, begum, creditor, debtor, settings);
     const action = result.actions.find((a) => a.category === 'amountMismatch');
     expect(action?.messageKey).toBe('action.amountMismatchVat');
@@ -263,18 +280,18 @@ describe('naming the cause of a difference', () => {
 describe('payment allocation and ageing', () => {
   it('settles many invoices from one bulk payment, oldest first', () => {
     const creditor = statement('a', 'receivable', [
-      entry('c1', '2026-06-01', 'F1', 10000, 0),
-      entry('c2', '2026-06-05', 'F2', 10000, 0),
-      entry('c3', '2026-06-10', 'F3', 10000, 0),
+      entry('c1', '2026-06-01', 'FTR2026000101', 10000, 0),
+      entry('c2', '2026-06-05', 'FTR2026000102', 10000, 0),
+      entry('c3', '2026-06-10', 'FTR2026000103', 10000, 0),
       entry('c4', '2026-07-15', 'BULK', 0, 25000),
     ]);
     const debtor = statement('b', 'payable', [entry('d4', '2026-07-15', 'BULK', 25000, 0)]);
     const { allocation } = reconcilePair(abc, begum, creditor, debtor, settings);
 
     const byDoc = new Map(allocation.invoices.map((i) => [i.entry.docNo, i]));
-    expect(byDoc.get('F1')?.open).toBe(0);
-    expect(byDoc.get('F2')?.open).toBe(0);
-    expect(byDoc.get('F3')?.open).toBe(5000);
+    expect(byDoc.get('FTR2026000101')?.open).toBe(0);
+    expect(byDoc.get('FTR2026000102')?.open).toBe(0);
+    expect(byDoc.get('FTR2026000103')?.open).toBe(5000);
     expect(allocation.unappliedPayments).toBe(0);
   });
 
@@ -293,9 +310,9 @@ describe('payment allocation and ageing', () => {
 
   it('ages an unpaid invoice from its vade and raises an action', () => {
     const creditor = statement('a', 'receivable', [
-      entry('c1', '2026-06-01', 'F1', 10000, 0, { dueDate: '2026-07-01' }),
+      entry('c1', '2026-06-01', 'FTR2026000101', 10000, 0, { dueDate: '2026-07-01' }),
     ]);
-    const debtor = statement('b', 'payable', [entry('d1', '2026-06-01', 'F1', 0, 10000)]);
+    const debtor = statement('b', 'payable', [entry('d1', '2026-06-01', 'FTR2026000101', 0, 10000)]);
     const result = reconcilePair(abc, begum, creditor, debtor, settings);
     const invoice = result.allocation.invoices[0];
     expect(invoice.dueDateSource).toBe('statement');
@@ -306,8 +323,8 @@ describe('payment allocation and ageing', () => {
   });
 
   it('derives a vade from the agreed term when the file carries none', () => {
-    const creditor = statement('a', 'receivable', [entry('c1', '2026-08-15', 'F1', 10000, 0)]);
-    const debtor = statement('b', 'payable', [entry('d1', '2026-08-15', 'F1', 0, 10000)]);
+    const creditor = statement('a', 'receivable', [entry('c1', '2026-08-15', 'FTR2026000101', 10000, 0)]);
+    const debtor = statement('b', 'payable', [entry('d1', '2026-08-15', 'FTR2026000101', 0, 10000)]);
     const result = reconcilePair(abc, begum, creditor, debtor, settings);
     const invoice = result.allocation.invoices[0];
     expect(invoice.dueDateSource).toBe('term');

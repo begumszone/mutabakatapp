@@ -18,6 +18,24 @@ interface Candidate {
   taken: boolean;
 }
 
+/**
+ * How much document number is needed before it may be matched on.
+ *
+ * Padding zeros are squeezed out of a key, which is right for an invoice
+ * serial and dangerous for an internal one: a Logo export numbers its fişler
+ * 0000000000000001 upwards, and stripping the padding leaves "1". Both firms
+ * have a fiş 1, a fiş 2 and a fiş 3, and none of them are the same document.
+ * Below these lengths a key carries no evidence, so the line falls through to
+ * the date and amount passes instead.
+ */
+const MIN_KEY_LENGTH = 4;
+/** Matching without the amounts agreeing needs a number worth trusting. */
+const MIN_KEY_LENGTH_WITHOUT_AMOUNT = 6;
+
+function keyIfLongEnough(key: string, minimum: number): string {
+  return key.length >= minimum ? key : '';
+}
+
 function sign(value: number): number {
   return value > 0 ? 1 : value < 0 ? -1 : 0;
 }
@@ -214,10 +232,31 @@ export function matchStatements(
 
   const pairs: MatchedPair[] = [];
 
-  runKeyedPass(creditors, debtors, (c) => c.entry.docKey, 'docNoAndAmount', settings, true, pairs);
-  runKeyedPass(creditors, debtors, (c) => c.entry.docKey, 'docNo', settings, false, pairs);
-  runKeyedPass(creditors, debtors, (c) => c.entry.docKeyLoose, 'docNoLoose', settings, true, pairs);
-  runKeyedPass(creditors, debtors, (c) => c.entry.docKeyLoose, 'docNoLoose', settings, false, pairs);
+  const exact = (c: Candidate, minimum = MIN_KEY_LENGTH) =>
+    keyIfLongEnough(c.entry.docKey, minimum);
+  const loose = (c: Candidate, minimum = MIN_KEY_LENGTH) =>
+    keyIfLongEnough(c.entry.docKeyLoose, minimum);
+
+  runKeyedPass(creditors, debtors, (c) => exact(c), 'docNoAndAmount', settings, true, pairs);
+  runKeyedPass(
+    creditors,
+    debtors,
+    (c) => exact(c, MIN_KEY_LENGTH_WITHOUT_AMOUNT),
+    'docNo',
+    settings,
+    false,
+    pairs,
+  );
+  runKeyedPass(creditors, debtors, (c) => loose(c), 'docNoLoose', settings, true, pairs);
+  runKeyedPass(
+    creditors,
+    debtors,
+    (c) => loose(c, MIN_KEY_LENGTH_WITHOUT_AMOUNT),
+    'docNoLoose',
+    settings,
+    false,
+    pairs,
+  );
   runKeyedPass(
     creditors,
     debtors,
