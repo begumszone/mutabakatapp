@@ -41,7 +41,7 @@ const ACCOUNT_CODE_HEAD = /^(\d{3}(?:[.\-/]\d+)+)/;
 
 /** Labels that are never a company name, however prominent they look. */
 const NOT_A_NAME =
-  /(tel\s*:|faks|fax|adres|v\.?\s*dairesi|sayfa|tarih|hareket dokumu|ekstre|doviz|rapor|yazdir|toplam)/;
+  /(tel\s*:|faks|fax|adres|v\.?\s*dairesi|sayfa|tarih|hareket dokumu|ekstre|doviz|rapor|yazdir|toplam|hesap adi|alt hesap|ana hesap|hesap kodu)/;
 
 /** Report titles and the template's own placeholders, not firms. */
 const REPORT_TITLE =

@@ -86,3 +86,16 @@ describe.skipIf(!existsSync(FIXTURE))('against the real AKVATEK export', () => {
     expect(euroPreamble.periodEnd).toBe('2026-08-31');
   });
 });
+
+describe('labels that are not firms', () => {
+  it('does not read a field label as the counterparty', () => {
+    // A real export prints "Alt Hesap Adı :" with the value in another cell,
+    // and the label was being taken for the firm.
+    const preamble = readPreamble(
+      [['Cari Kod', '320-01-001', 'Alt Hesap Adı :'], ['Tarih', 'Borç']],
+      1,
+    );
+    expect(preamble.counterpartyName).toBeNull();
+    expect(preamble.counterpartyCode).toBe('320-01-001');
+  });
+});

@@ -5,9 +5,16 @@ const TR_MAP: Record<string, string> = {
   ü: 'u', Ü: 'u', ö: 'o', Ö: 'o', ç: 'c', Ç: 'c',
 };
 
-/** Lower-cases and strips Turkish diacritics so "FATURA" and "Fatura" agree. */
-export function foldText(value: string): string {
-  return value
+/**
+ * Lower-cases and strips Turkish diacritics so "FATURA" and "Fatura" agree.
+ *
+ * Tolerates a missing value because the grids these strings come from are
+ * sparse: a spreadsheet row with gaps in it yields holes, and anything that
+ * maps over such a row hands on `undefined` rather than a blank.
+ */
+export function foldText(value: string | null | undefined): string {
+  if (value === null || value === undefined) return '';
+  return String(value)
     .split('')
     .map((ch) => TR_MAP[ch] ?? ch)
     .join('')
