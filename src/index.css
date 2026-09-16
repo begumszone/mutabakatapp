@@ -5,31 +5,58 @@
  * verdict, and red/green used only where a sign genuinely matters.
  */
 
+/*
+ * Cream, navy and bordeaux.
+ *
+ * The three theme colours are kept strictly apart from the two status
+ * colours, because on this screen a colour is a claim about money. Navy
+ * carries every interactive and selected state; bordeaux is identity only —
+ * the wordmark and the rule under a table header — and never says anything
+ * about a figure. That separation is what lets red keep its single meaning:
+ * a difference, or something wrong. Bordeaux and red are both dark reds, so
+ * if bordeaux were ever used on a number, "this is our brand" and "this does
+ * not reconcile" would look like the same statement.
+ *
+ * Green means agreed. Red means a gap. Nothing else is allowed either one.
+ */
+
 :root {
-  --bg: #f4f6fa;
-  --surface: #ffffff;
-  --surface-2: #eef1f7;
-  --surface-3: #e3e8f1;
-  --border: #d5dbe7;
-  --border-strong: #b9c2d4;
-  --text: #17203a;
-  --text-muted: #5a6786;
-  --text-faint: #8b96af;
+  --bg: #f4eee0;
+  --surface: #fffdf8;
+  --surface-2: #efe7d6;
+  --surface-3: #e4d9c3;
+  --border: #ddd2bc;
+  --border-strong: #c3b69b;
+  --text: #1a2743;
+  --text-muted: #4e5b79;
+  --text-faint: #8a8270;
 
-  --accent: #1f5fd0;
-  --accent-soft: #e5edfc;
-  --accent-text: #ffffff;
+  /* Navy: every interactive and selected state. */
+  --accent: #1e3a66;
+  --accent-soft: #e2e8f1;
+  --accent-text: #fffdf8;
 
-  --good: #12734a;
-  --good-soft: #dff3e8;
-  --bad: #b3261e;
-  --bad-soft: #fbe4e2;
-  --warn: #8a5a00;
-  --warn-soft: #fdf0d6;
+  /* Bordeaux: identity only, never a verdict about a number. */
+  --brand: #7a2733;
+  --brand-soft: #f1e1e2;
+  /* The rule under a table header. Bordeaux on cream is unmistakably dark
+     red; on a navy background the same hue has to be lightened so far that
+     it turns pink and starts competing with the status red sitting in the
+     Fark column, so dark mode uses a neutral instead. */
+  --rule: var(--brand);
+
+  --good: #2b6b4c;
+  --good-soft: #dcebe1;
+  /* Deliberately brighter and warmer than the bordeaux above: a status red
+     that reads like bordeaux would blur "our brand" into "this is wrong". */
+  --bad: #c0362c;
+  --bad-soft: #fae3df;
+  --warn: #85560a;
+  --warn-soft: #f6e8c9;
 
   --radius: 10px;
   --radius-sm: 6px;
-  --shadow: 0 1px 2px rgba(23, 32, 58, 0.06), 0 6px 20px rgba(23, 32, 58, 0.06);
+  --shadow: 0 1px 2px rgba(26, 39, 67, 0.07), 0 6px 20px rgba(26, 39, 67, 0.07);
 
   --font: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
   --mono: 'SF Mono', ui-monospace, 'Cascadia Mono', Menlo, Consolas, monospace;
@@ -38,28 +65,32 @@
 }
 
 :root[data-theme='dark'] {
-  --bg: #0e1320;
-  --surface: #161d2e;
-  --surface-2: #1d2537;
-  --surface-3: #263048;
-  --border: #2b3549;
-  --border-strong: #3c4863;
-  --text: #e8ecf6;
-  --text-muted: #a3aec7;
-  --text-faint: #7683a0;
+  --bg: #111a2b;
+  --surface: #1a2337;
+  --surface-2: #222c43;
+  --surface-3: #2c3853;
+  --border: #2e3a55;
+  --border-strong: #445275;
+  --text: #f2ead9;
+  --text-muted: #b2bacb;
+  --text-faint: #8791a6;
 
-  --accent: #6d9eff;
-  --accent-soft: #1c2b4a;
-  --accent-text: #0e1320;
+  --accent: #86aae3;
+  --accent-soft: #1d2a45;
+  --accent-text: #101726;
 
-  --good: #4ec98a;
-  --good-soft: #14301f;
+  --brand: #cf8490;
+  --brand-soft: #34202a;
+  --rule: #5d6c8c;
+
+  --good: #5fc48d;
+  --good-soft: #143020;
   --bad: #ff8b82;
-  --bad-soft: #341a19;
+  --bad-soft: #3a1e1c;
   --warn: #e8b55c;
   --warn-soft: #33260e;
 
-  --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.32), 0 8px 24px rgba(0, 0, 0, 0.3);
   color-scheme: dark;
 }
 
@@ -107,6 +138,7 @@ p { margin: 0; }
   font-weight: 700;
   letter-spacing: -0.02em;
   font-size: 18px;
+  color: var(--brand);
 }
 .brand .tag { color: var(--text-faint); font-size: 13px; }
 
@@ -137,6 +169,10 @@ p { margin: 0; }
   gap: 10px;
 }
 .card-head .spacer { flex: 1; }
+/* Section titles carry the bordeaux. They name a part of the page and never
+   pass judgement on a figure, so the theme gets its second colour without
+   ever reading as a status. */
+.card-head h2 { color: var(--brand); }
 .card-body { padding: 18px; }
 .card-body.tight { padding: 12px 18px; }
 
@@ -277,6 +313,7 @@ th {
   font-size: 12px; font-weight: 600; text-transform: uppercase;
   letter-spacing: 0.04em; color: var(--text-muted);
   background: var(--surface-2);
+  border-bottom: 2px solid var(--rule);
   position: sticky; top: 0;
 }
 td.n, th.n { text-align: right; font-variant-numeric: tabular-nums; }
