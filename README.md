@@ -108,6 +108,20 @@ belgelerin neti. Bir bakiyeyi başka hiçbir şey oynatamaz. Uygulama bu
 özdeşliği her çalıştırmada doğrular; tutmuyorsa sonucu "tutmuş" gibi
 sunmak yerine eşlemenin tutarsız olduğunu söyler.
 
+## Yayına alma
+
+Uygulama tamamen istemci tarafında çalışır; yayınlanacak tek şey statik
+dosyalardır ve yüklenen hiçbir veri tarayıcıdan çıkmaz — bu, nasıl
+sunulursa sunulsun değişmez.
+
+**Vercel:** repoyu içe aktarın. Preset Vite, derleme `npm run build`,
+çıktı dizini `dist`. Başka ayar gerekmez.
+
+**GitHub Pages:** Actions sekmesinden `Pages` iş akışını çalıştırın.
+Öncesinde iki ayar gerekiyor: *Settings → Actions → General → Workflow
+permissions* → "Read and write", ve *Settings → Pages → Source* →
+"GitHub Actions".
+
 ## Çalıştırma
 
 ```bash

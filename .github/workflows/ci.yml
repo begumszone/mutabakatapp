@@ -1,0 +1,24 @@
+# Runs on every push: install, test, build.
+#
+# Deliberately does not publish anything, so it passes or fails on the code
+# alone. Publishing lives in pages.yml, which needs a repository permission
+# this token does not have by default — mixing the two meant a green build
+# still sent a failure notification.
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - run: npm test
+      - run: npm run build
