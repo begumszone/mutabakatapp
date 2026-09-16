@@ -91,23 +91,32 @@ export function sheetToParsedFile(
   };
 }
 
-async function parseCsvWorkbook(file: File): Promise<ParsedWorkbook> {
-  const text = await file.text();
+function parseCsvText(fileName: string, text: string): ParsedWorkbook {
   const result = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' });
   if (result.errors.length > 0 && (!result.data || result.data.length === 0)) {
-    throw new FileParseError(`Could not read "${file.name}" as CSV: ${result.errors[0].message}`);
+    throw new FileParseError(`"${fileName}" okunamadı (CSV): ${result.errors[0].message}`);
   }
   const grid = (result.data as unknown[][]).map((row) => row.map((c) => normalizeCell(c)));
-  if (grid.length === 0) throw new FileParseError(`"${file.name}" appears to be empty.`);
-  return { fileName: file.name, sheets: [makeSheet('Sheet 1', grid)] };
+  if (grid.length === 0) throw new FileParseError(`"${fileName}" boş görünüyor.`);
+  return { fileName, sheets: [makeSheet('Sheet 1', grid)] };
 }
 
-async function parseXlsxWorkbook(file: File): Promise<ParsedWorkbook> {
+/**
+ * Reads workbook bytes, whatever produced them.
+ *
+ * Kept separate from the browser's File API so the same parser can be driven
+ * by a test fixture on disk — which is how this is checked against real
+ * customer exports — and, later, by an ERP adapter that never touches a file
+ * picker at all.
+ */
+export async function parseXlsxBuffer(
+  fileName: string,
+  buffer: ArrayBuffer,
+): Promise<ParsedWorkbook> {
   const workbook = new ExcelJS.Workbook();
-  const buffer = await file.arrayBuffer();
   await workbook.xlsx.load(buffer);
   if (workbook.worksheets.length === 0) {
-    throw new FileParseError(`"${file.name}" does not contain any worksheets.`);
+    throw new FileParseError(`"${fileName}" hiç sayfa içermiyor.`);
   }
 
   const sheets: ParsedSheet[] = [];
@@ -122,20 +131,20 @@ async function parseXlsxWorkbook(file: File): Promise<ParsedWorkbook> {
   }
 
   if (sheets.length === 0) {
-    throw new FileParseError(`Every sheet in "${file.name}" is empty.`);
+    throw new FileParseError(`"${fileName}" içindeki her sayfa boş.`);
   }
-  return { fileName: file.name, sheets };
+  return { fileName, sheets };
 }
 
 export async function parseWorkbook(file: File): Promise<ParsedWorkbook> {
   const name = file.name.toLowerCase();
   if (name.endsWith('.csv') || name.endsWith('.txt') || name.endsWith('.tsv')) {
-    return parseCsvWorkbook(file);
+    return parseCsvText(file.name, await file.text());
   }
   if (name.endsWith('.xlsx') || name.endsWith('.xlsm')) {
-    return parseXlsxWorkbook(file);
+    return parseXlsxBuffer(file.name, await file.arrayBuffer());
   }
   throw new FileParseError(
-    `Unsupported file type for "${file.name}". Please upload a .csv or .xlsx file.`,
+    `"${file.name}" desteklenmeyen bir dosya türü. .csv veya .xlsx yükleyin.`,
   );
 }

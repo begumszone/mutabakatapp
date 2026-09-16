@@ -5,3 +5,9 @@ dist-ssr
 .DS_Store
 .vite
 coverage
+
+# Real customer exports used as local test fixtures. Never committed:
+# sharing a counterparty's ledger is the account owner's decision, not the
+# repository's.
+sample-data/*.xlsx
+sample-data/*.XLSX
