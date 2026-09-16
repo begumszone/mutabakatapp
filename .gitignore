@@ -7,6 +7,11 @@ dist-ssr
 coverage
 *.tsbuildinfo
 
+# Throwaway analysis scripts. They read the real customer files, which are
+# not committed, so one of them reaching CI fails the build for a reason
+# that has nothing to do with the app.
+scripts/
+
 # Real customer exports used as local test fixtures. Never committed:
 # sharing a counterparty's ledger is the account owner's decision, not the
 # repository's.
