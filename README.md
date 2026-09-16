@@ -114,8 +114,13 @@ Uygulama tamamen istemci tarafında çalışır; yayınlanacak tek şey statik
 dosyalardır ve yüklenen hiçbir veri tarayıcıdan çıkmaz — bu, nasıl
 sunulursa sunulsun değişmez.
 
-**Vercel:** repoyu içe aktarın. Preset Vite, derleme `npm run build`,
-çıktı dizini `dist`. Başka ayar gerekmez.
+**Vercel:** vercel.com/new → repoyu içe aktarın → Deploy. Ayarlar
+`vercel.json` içinde sabit olduğu için içe aktarma ekranında hiçbir şey
+seçmeniz gerekmez. Repo listede görünmüyorsa, Vercel'in GitHub
+uygulamasının yalnızca seçili repolara erişimi vardır: aynı ekrandaki
+*Adjust GitHub App Permissions* ile `mutabakatapp`'i ekleyin.
+
+İlk içe aktarmadan sonra `main`'e her push kendiliğinden yayına gider.
 
 **GitHub Pages:** Actions sekmesinden `Pages` iş akışını çalıştırın.
 Öncesinde iki ayar gerekiyor: *Settings → Actions → General → Workflow
