@@ -103,6 +103,7 @@ const FIELDS: Record<string, FieldSpec> = {
   amount: {
     candidates: [
       { needle: 'amount in local currency', score: 10 },
+      { needle: 'up cinsinden tutar', score: 10 },
       { needle: 'yerel para tutar', score: 10 },
       { needle: 'amount in doc', score: 7 },
       { needle: 'tutar', score: 6 },
@@ -189,7 +190,27 @@ function numericShare(rows: RawRow[], header: string | null): number {
   return filled === 0 ? 0 : numeric / filled;
 }
 
-/** How many of a column's non-blank values read as dates. */
+/**
+ * How much of the sheet a column actually dates.
+ *
+ * Distinct from the purity below, and the distinction is the whole point: a
+ * column that holds nothing but dates in the third of rows where it is
+ * filled looks perfect by purity and dates only a third of the statement.
+ * Choosing it drops every blank row, and those rows then read as documents
+ * the counterparty never booked.
+ */
+function dateCoverage(rows: RawRow[], header: string | null): number {
+  if (!header) return 0;
+  const sample = rows.slice(0, 200);
+  if (sample.length === 0) return 0;
+  let dates = 0;
+  for (const row of sample) {
+    if (parseDate(row[header] as string | number) !== null) dates++;
+  }
+  return dates / sample.length;
+}
+
+/** Of the values a column does hold, how many read as dates. */
 function dateShare(rows: RawRow[], header: string | null): number {
   if (!header) return 0;
   let filled = 0;
@@ -238,8 +259,33 @@ export function suggestMapping(file: ParsedFile): ColumnMapping {
     return null;
   };
 
-  const date = pickChecked('date', (h) => dateShare(rows, h) >= 0.5);
-  const dueDate = pickChecked('dueDate', (h) => dateShare(rows, h) >= 0.5);
+  /**
+   * Picks the date column by how much of the sheet it actually dates, not
+   * only by what it is called.
+   *
+   * A Logo ekstre carries both "Tarih" and "Belge tarihi", and on some sheets
+   * the second is filled in for two rows out of three. Its name scores
+   * higher, but choosing it drops every row it leaves blank — ten real
+   * movements on one of these files, fifty-four on another — and those rows
+   * then look like documents the other side never booked. Coverage wins
+   * unless the better-named column is nearly as complete.
+   */
+  const pickDate = (field: string): string | null => {
+    const candidates = rank(headers, FIELDS[field])
+      .map((header) => ({
+        header,
+        purity: dateShare(rows, header),
+        coverage: dateCoverage(rows, header),
+      }))
+      // Purity says it is a date column at all; coverage decides which one.
+      .filter((item) => item.purity >= 0.5);
+    if (candidates.length === 0) return null;
+    const best = candidates.reduce((a, b) => (b.coverage > a.coverage + 0.02 ? b : a));
+    return best.header;
+  };
+
+  const date = pickDate('date');
+  const dueDate = pickDate('dueDate');
 
   const docNoRanked = rank(headers, FIELDS.docNo);
   const docNo = docNoRanked[0] ?? null;

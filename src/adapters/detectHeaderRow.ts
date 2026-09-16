@@ -8,6 +8,24 @@ function filled(row: Cell[]): number {
   return row.filter((c) => !isBlank(c)).length;
 }
 
+/**
+ * How many distinct values a row holds.
+ *
+ * A merged cell repeats its text across every column it spans, so a report
+ * title stretched over the sheet arrives as one word twelve times. It is
+ * wide and textual and sits above data — everything a header is scored for —
+ * and on one real export it beat the actual header row and left the sheet
+ * unreadable.
+ */
+function distinctCount(row: Cell[]): number {
+  const seen = new Set<string>();
+  for (const cell of row) {
+    if (isBlank(cell)) continue;
+    seen.add(String(cell).trim());
+  }
+  return seen.size;
+}
+
 function numericCount(row: Cell[]): number {
   return row.filter((c) => typeof c === 'number' || (typeof c === 'string' && /^-?[\d.,\s]+$/.test(c.trim()) && /\d/.test(c))).length;
 }
@@ -38,6 +56,11 @@ export function detectHeaderRowIndex(grid: Cell[][]): number {
 
     const numbers = numericCount(row);
     const textCells = cells - numbers;
+    const distinct = distinctCount(row);
+    // Column names are all different from one another; a title is one value
+    // repeated. Two distinct values across a wide row is a banner, not a
+    // header.
+    if (cells >= 3 && distinct <= Math.max(2, cells * 0.4)) continue;
 
     const next = grid[i + 1];
     if (!next || filled(next) === 0) continue; // a header must be followed by data
