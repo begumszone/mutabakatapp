@@ -52,5 +52,6 @@ export function reconcilePair(
     bridge,
     allocation,
     actions,
+    asOfDate: settings.asOfDate,
   };
 }

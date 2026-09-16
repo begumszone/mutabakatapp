@@ -241,6 +241,8 @@ export interface PairReconciliation {
   bridge: BalanceBridge;
   allocation: AllocationResult;
   actions: RecommendedAction[];
+  /** The date ageing and the result table are stated as of. */
+  asOfDate: string;
 }
 
 // ---------------------------------------------------------------------------

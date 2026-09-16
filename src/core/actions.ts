@@ -16,6 +16,9 @@ const VAT_RATIOS = [1.01, 1.08, 1.1, 1.18, 1.2];
 const FX_RATIO_MIN = 1.5;
 const FX_RATIO_MAX = 200;
 
+/** Above this, a small ratio stops looking like two FX rates for one invoice. */
+const RATE_GAP_MAX = 1.25;
+
 function severityForAmount(amount: number, materiality: number): ActionSeverity {
   const size = Math.abs(amount);
   if (size >= materiality * 5) return 'critical';
@@ -26,15 +29,21 @@ function severityForAmount(amount: number, materiality: number): ActionSeverity 
 /**
  * Explains *why* two sides booked the same document at different figures.
  *
- * Almost every real difference in these files has one of three causes, and
- * naming the cause is the difference between "there is a 8.286,26 TL gap"
- * and "ABBOTT converted at 53,12 and KONSENSUS at 54,50". So we test the
- * ratio between the two amounts: close to a VAT rate means one side booked
- * gross and the other net; inside the plausible FX band with different
- * currencies on the two lines means a rate difference, and we report the
- * implied rate so the accountant can check it against their own; anything
- * else is left as an unexplained mismatch rather than dressed up as a
- * diagnosis.
+ * Almost every real difference in these reconciliations has one of three
+ * causes, and naming the cause is the difference between "there is a 8.286,26
+ * TL gap" and "ABBOTT converted at 53,12 and KONSENSUS at 54,50". So the
+ * ratio between the two amounts is tested against each cause in turn:
+ *
+ * - exactly a VAT rate: one side booked gross, the other net;
+ * - a large ratio with different currencies on the two lines: one side never
+ *   converted at all, and the ratio is the rate it should have used;
+ * - a small ratio, a few percent either way: both sides converted the same
+ *   foreign-currency invoice, at different rates. This is by far the most
+ *   common one in practice and the easiest to mistake for a pricing dispute,
+ *   so it is reported as the percentage gap between the two rates.
+ *
+ * Anything else is left as an unexplained mismatch rather than dressed up as
+ * a diagnosis.
  */
 function classifyAmountDifference(pair: MatchedPair): {
   key: string;
@@ -56,12 +65,23 @@ function classifyAmountDifference(pair: MatchedPair): {
       }
     }
 
-    const currenciesDiffer = pair.creditorEntry.currency !== pair.debtorEntry.currency;
-    if (ratio >= FX_RATIO_MIN && ratio <= FX_RATIO_MAX && currenciesDiffer) {
-      return { key: 'action.amountMismatchFx', vars: { ...base, rate: round2(ratio) } };
-    }
+    const currenciesDiffer =
+      pair.creditorEntry.currency !== '' &&
+      pair.debtorEntry.currency !== '' &&
+      pair.creditorEntry.currency !== pair.debtorEntry.currency;
+
     if (ratio >= FX_RATIO_MIN && ratio <= FX_RATIO_MAX) {
-      return { key: 'action.amountMismatchMaybeFx', vars: { ...base, rate: round2(ratio) } };
+      return {
+        key: currenciesDiffer ? 'action.amountMismatchFx' : 'action.amountMismatchMaybeFx',
+        vars: { ...base, rate: round2(ratio) },
+      };
+    }
+
+    if (ratio > 1.0005 && ratio <= RATE_GAP_MAX) {
+      return {
+        key: 'action.amountMismatchRate',
+        vars: { ...base, percent: round2((ratio - 1) * 100) },
+      };
     }
   }
 

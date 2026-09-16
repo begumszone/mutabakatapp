@@ -181,6 +181,62 @@ describe('the balance bridge', () => {
   });
 });
 
+describe('naming the cause of a difference', () => {
+  it('pairs an invoice the two ERPs padded differently, even at different amounts', () => {
+    // SAP writes one more zero than Logo does, and the invoice is also
+    // converted at two different rates — the combination that would otherwise
+    // be reported as two unrelated missing records.
+    const creditor = statement('a', 'receivable', [
+      entry('c1', '2026-03-03', 'ABC2026000000105', 106240, 0),
+    ]);
+    const debtor = statement('b', 'payable', [
+      entry('d1', '2026-03-03', 'ABC202600000105', 0, 103548.8),
+    ]);
+    const result = reconcilePair(abc, begum, creditor, debtor, settings);
+    expect(result.match.pairs).toHaveLength(1);
+    expect(result.match.pairs[0].basis).toBe('docNoLoose');
+    expect(result.match.creditorOnly).toHaveLength(0);
+    expect(result.match.debtorOnly).toHaveLength(0);
+  });
+
+  it('reads a few percent between two amounts as two different FX rates', () => {
+    // The real figures from a KONSENSUS/ABBOTT reconciliation: 53,12 against
+    // 54,50 on the same euro invoice.
+    const creditor = statement('a', 'receivable', [
+      entry('c1', '2026-05-29', 'KON2026000000163', 102260, 0),
+    ]);
+    const debtor = statement('b', 'payable', [
+      entry('d1', '2026-05-29', 'KON2026000000163', 0, 104912.5),
+    ]);
+    const result = reconcilePair(abc, begum, creditor, debtor, settings);
+    const action = result.actions.find((a) => a.category === 'amountMismatch');
+    expect(action?.messageKey).toBe('action.amountMismatchRate');
+    expect(action?.messageVars.percent).toBe(2.59);
+  });
+
+  it('recognises a gap that is exactly the VAT', () => {
+    const creditor = statement('a', 'receivable', [entry('c1', '2026-05-29', 'F1', 12000, 0)]);
+    const debtor = statement('b', 'payable', [entry('d1', '2026-05-29', 'F1', 0, 10000)]);
+    const result = reconcilePair(abc, begum, creditor, debtor, settings);
+    const action = result.actions.find((a) => a.category === 'amountMismatch');
+    expect(action?.messageKey).toBe('action.amountMismatchVat');
+    expect(action?.messageVars.rate).toBe(20);
+  });
+
+  it('calls out an invoice one side never converted out of its own currency', () => {
+    const creditor = statement('a', 'receivable', [
+      entry('c1', '2026-08-01', 'AL62026000005029', 15299.14, 0, { currency: 'TRY' }),
+    ]);
+    const debtor = statement('b', 'payable', [
+      entry('d1', '2026-08-01', 'AL6202600005029', 0, 280.8, { currency: 'EUR' }),
+    ]);
+    const result = reconcilePair(abc, begum, creditor, debtor, settings);
+    const action = result.actions.find((a) => a.category === 'amountMismatch');
+    expect(action?.messageKey).toBe('action.amountMismatchFx');
+    expect(action?.messageVars.rate).toBe(54.48);
+  });
+});
+
 describe('payment allocation and ageing', () => {
   it('settles many invoices from one bulk payment, oldest first', () => {
     const creditor = statement('a', 'receivable', [

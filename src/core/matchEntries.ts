@@ -183,7 +183,10 @@ export const DEFAULT_MATCH_SETTINGS: MatchSettings = {
  * 2. same document number, different amount — the same invoice booked at two
  *    figures, which is a finding in itself rather than a failure to match;
  * 3. same document number once padding zeros are squeezed out, since the two
- *    ERPs pad the same invoice serial differently;
+ *    ERPs pad the same invoice serial differently — with, then without, the
+ *    amount having to agree, because the invoice whose serial is padded
+ *    differently is very often the same invoice converted at two different
+ *    FX rates;
  * 4. same trailing serial — one side kept the series prefix, the other did not;
  * 5. same amount within a few days — for payments and dekonts that carry no
  *    usable reference at all;
@@ -214,6 +217,7 @@ export function matchStatements(
   runKeyedPass(creditors, debtors, (c) => c.entry.docKey, 'docNoAndAmount', settings, true, pairs);
   runKeyedPass(creditors, debtors, (c) => c.entry.docKey, 'docNo', settings, false, pairs);
   runKeyedPass(creditors, debtors, (c) => c.entry.docKeyLoose, 'docNoLoose', settings, true, pairs);
+  runKeyedPass(creditors, debtors, (c) => c.entry.docKeyLoose, 'docNoLoose', settings, false, pairs);
   runKeyedPass(
     creditors,
     debtors,
