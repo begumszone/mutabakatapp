@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import type {
   ColumnMapping,
   Locale,
+  Period,
   PairReconciliation,
   ParsedFile,
   ParsedWorkbook,
@@ -11,10 +12,11 @@ import type {
   StatementEntry,
 } from './types';
 import { translate } from './lib/i18n';
-import { sampleFiles } from './lib/sampleData';
+import { sampleFiles, samplePeriodMismatch } from './lib/sampleData';
 import { FileParseError, parseWorkbook, sheetToParsedFile } from './adapters/parseFile';
 import { suggestMapping, validateMapping } from './adapters/suggestMapping';
 import { buildStatement, makeStatement, type BuildResult } from './adapters/buildStatement';
+import { EMPTY_PREAMBLE, readPreamble, type Preamble } from './adapters/readPreamble';
 import { orientEntries } from './core/claim';
 import { hasClearingInformation, reconcilePair } from './core/reconcilePair';
 import { todayIso } from './core/parseDate';
@@ -42,6 +44,8 @@ interface Source {
   headerRow: number;
   mapping: ColumnMapping;
   perspective: Perspective;
+  /** What the sheet said about itself above its column headers. */
+  preamble: Preamble;
 }
 
 interface Side {
@@ -83,17 +87,66 @@ function makeSource(
       amount: null, currency: null, clearingDoc: null,
     },
     perspective: perspective ?? 'receivable',
+    preamble: EMPTY_PREAMBLE,
   };
   const parsed = fileOf(base);
   if (!parsed) return null;
   const mapping = suggestMapping(parsed);
   const build = buildStatement(parsed, mapping);
-  return { ...base, mapping, perspective: perspective ?? build.suggestedPerspective };
+  const grid = workbook?.sheets[sheetIndex]?.grid;
+  const preamble = grid ? readPreamble(grid, headerRow) : EMPTY_PREAMBLE;
+  return {
+    ...base,
+    mapping,
+    preamble,
+    perspective: perspective ?? build.suggestedPerspective,
+  };
 }
 
 interface SideBuild {
   views: SourceView[];
   entries: StatementEntry[];
+}
+
+/**
+ * The best name available for one side of the relationship.
+ *
+ * A firm's own ekstre names it at the top; the *other* firm's ekstre names it
+ * again, as the counterparty whose card is being kept. Either is better than
+ * the file name, which on these exports reads "AİR LIQUIDE-AKVATEK SU AŞ
+ * FARK TABLOSU" and would go straight onto the result table as a company.
+ */
+function suggestPartyName(own: Side, other: Side): string | null {
+  for (const source of own.sources) {
+    if (source.preamble.ownerName) return source.preamble.ownerName;
+  }
+  for (const source of other.sources) {
+    if (source.preamble.counterpartyName) return source.preamble.counterpartyName;
+  }
+  return null;
+}
+
+/**
+ * A firm's tax number as recorded by the *other* side.
+ *
+ * Each ekstre carries the tax number of the counterparty whose card it keeps,
+ * not its own — so the figure that identifies this firm is printed on the
+ * other firm's statement.
+ */
+function firstTaxId(other: Side): string | null {
+  for (const source of other.sources) {
+    if (source.preamble.counterpartyTaxId) return source.preamble.counterpartyTaxId;
+  }
+  return null;
+}
+
+/** The period a side's sheets state, when any of them state one. */
+function statedPeriodOf(side: Side): Period | null {
+  for (const source of side.sources) {
+    const { periodStart, periodEnd } = source.preamble;
+    if (periodStart && periodEnd) return { start: periodStart, end: periodEnd };
+  }
+  return null;
 }
 
 /**
@@ -159,6 +212,13 @@ export function App() {
   const creditorBuild = useMemo(() => buildSide(creditorSide), [creditorSide]);
   const debtorBuild = useMemo(() => buildSide(debtorSide), [debtorSide]);
 
+  // What the files say the two firms are called, unless the user has said
+  // otherwise. Typed names always win: the reader can see both.
+  const creditorName =
+    creditorSide.partyName || suggestPartyName(creditorSide, debtorSide) || t('common.creditor');
+  const debtorName =
+    debtorSide.partyName || suggestPartyName(debtorSide, creditorSide) || t('common.debtor');
+
   // An export that names the document which closed each line is telling us it
   // is an open-item list, so that reading is the default whenever one appears.
   const clearingAvailable = useMemo(
@@ -185,14 +245,20 @@ export function App() {
     }
   };
 
-  const loadSample = () => {
-    const { creditor, debtor } = sampleFiles();
+  const loadSample = (which: 'matched' | 'periodMismatch') => {
     const one = (parsed: ParsedFile, name: string, perspective: Perspective): Side => {
       const source = makeSource(null, parsed, 0, 0, perspective);
       return { partyName: name, sources: source ? [source] : [] };
     };
-    setCreditorSide(one(creditor, 'ABC Limited', 'receivable'));
-    setDebtorSide(one(debtor, 'Begüm Teknoloji', 'payable'));
+    if (which === 'periodMismatch') {
+      const { creditor, debtor } = samplePeriodMismatch();
+      setCreditorSide(one(creditor, 'Koru Sigorta', 'receivable'));
+      setDebtorSide(one(debtor, 'ABC Limited', 'payable'));
+    } else {
+      const { creditor, debtor } = sampleFiles();
+      setCreditorSide(one(creditor, 'ABC Limited', 'receivable'));
+      setDebtorSide(one(debtor, 'Begüm Teknoloji', 'payable'));
+    }
     setSettings((current) => ({ ...current, asOfDate: '2026-06-30' }));
     setStep('map');
   };
@@ -228,7 +294,8 @@ export function App() {
       locale,
       title: t(`upload.${which}`),
       hint: t(`upload.${which}Hint`),
-      partyName: side.partyName,
+      partyName:
+        side.partyName || (which === 'creditor' ? suggestPartyName(creditorSide, debtorSide) : suggestPartyName(debtorSide, creditorSide)) || '',
       onPartyName: (name: string) => setSide((s) => ({ ...s, partyName: name })),
       sources: build.views,
       totalEntries: build.entries.length,
@@ -277,13 +344,13 @@ export function App() {
     if (!canRun) return;
     const creditor: Party = {
       id: 'creditor',
-      name: creditorSide.partyName || t('common.creditor'),
-      taxId: null,
+      name: creditorName,
+      taxId: firstTaxId(debtorSide) ?? null,
     };
     const debtor: Party = {
       id: 'debtor',
-      name: debtorSide.partyName || t('common.debtor'),
-      taxId: null,
+      name: debtorName,
+      taxId: firstTaxId(creditorSide) ?? null,
     };
 
     // Every source was oriented as it was read, so both merged ledgers are
@@ -305,6 +372,7 @@ export function App() {
       creditor.id,
       debtor.id,
       'receivable',
+      statedPeriodOf(creditorSide),
     );
     const debtorStatement = makeStatement(
       'debtor',
@@ -313,6 +381,7 @@ export function App() {
       debtor.id,
       creditor.id,
       'receivable',
+      statedPeriodOf(debtorSide),
     );
 
     setResult(
@@ -421,8 +490,11 @@ export function App() {
               >
                 {t('upload.continue')}
               </button>
-              <button className="ghost" type="button" onClick={loadSample}>
+              <button className="ghost" type="button" onClick={() => loadSample('matched')}>
                 {t('upload.sample')}
+              </button>
+              <button className="ghost" type="button" onClick={() => loadSample('periodMismatch')}>
+                {t('upload.samplePeriod')}
               </button>
               {!hasBoth && <span className="faint">{t('upload.bothNeeded')}</span>}
             </div>

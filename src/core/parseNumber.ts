@@ -41,7 +41,15 @@ export function parseAmount(value: string | number | null | undefined): number |
   return n;
 }
 
-/** Rounds to cents, killing the float noise that makes a bridge look unbalanced. */
+/**
+ * Rounds to cents, killing the float noise that makes a bridge look
+ * unbalanced.
+ *
+ * Also collapses negative zero. It is a real value in IEEE arithmetic and
+ * comes out of any sum that cancels from below, but "-0,00 ₺" in a
+ * reconciliation reads as a difference somebody then goes looking for.
+ */
 export function round2(value: number): number {
-  return Math.round((value + Number.EPSILON) * 100) / 100;
+  const rounded = Math.round((value + Number.EPSILON) * 100) / 100;
+  return rounded === 0 ? 0 : rounded;
 }

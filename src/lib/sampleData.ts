@@ -75,3 +75,65 @@ export function sampleFiles(): { creditor: ParsedFile; debtor: ParsedFile } {
 
   return { creditor, debtor };
 }
+
+/**
+ * The other situation these teams meet constantly: the two sides send
+ * different windows.
+ *
+ * Koru Sigorta sends the year to date; ABC Limited sends March onwards, with
+ * a devir standing for everything before it. Every document inside the
+ * overlap agrees — and the balances still do not, because the two sides
+ * disagree about where they stood entering March. No amount of matching can
+ * settle that, and the only useful output is to say so and name the
+ * statement that would.
+ */
+export function samplePeriodMismatch(): { creditor: ParsedFile; debtor: ParsedFile } {
+  const creditorRows: [string, string, string, string, number, number][] = [
+    ['01.01.2026', '01.01.2026', '', 'DEVİR', 0, 0],
+    ['20.01.2026', '19.02.2026', 'KRU2026000000101', 'Poliçe komisyon faturası', 100000, 0],
+    ['18.02.2026', '', 'BN0041', 'Gelen havale', 0, 50000],
+    ['12.03.2026', '11.04.2026', 'KRU2026000000140', 'Poliçe komisyon faturası', 40000, 0],
+    ['09.05.2026', '08.06.2026', 'KRU2026000000188', 'Poliçe komisyon faturası', 25000, 0],
+    ['14.06.2026', '', 'BN0219', 'Gelen havale', 0, 30000],
+  ];
+
+  const creditor: ParsedFile = {
+    fileName: 'Koru-Sigorta-cari-ekstre.xlsx',
+    sheetName: 'ABC LİMİTED',
+    headers: ['Tarih', 'Vade Tarihi', 'Fiş No', 'Açıklama', 'Borç Tut.', 'Alac.Tut.'],
+    rows: creditorRows.map((row) => ({
+      Tarih: row[0],
+      'Vade Tarihi': row[1] || null,
+      'Fiş No': row[2],
+      Açıklama: row[3],
+      'Borç Tut.': row[4],
+      'Alac.Tut.': row[5],
+    })),
+  };
+
+  // ABC's books open on 1 March at 63.250 — 13.250 above where Koru's
+  // detail says the account stood. The cause is in January or February,
+  // months ABC has not sent.
+  const debtorRows: [string, string, string, string, number, number][] = [
+    ['01.03.2026', '01.03.2026', '', 'DEVİR', 0, 63250],
+    ['12.03.2026', '11.04.2026', 'KRU2026000000140', 'FATURANIZ', 0, 40000],
+    ['09.05.2026', '08.06.2026', 'KRU2026000000188', 'FATURANIZ', 0, 25000],
+    ['14.06.2026', '', 'BN/0219', 'ZİRAAT KORU HS EFT', 30000, 0],
+  ];
+
+  const debtor: ParsedFile = {
+    fileName: 'ABC-Limited-cari-ekstre.xlsx',
+    sheetName: 'KORU SİGORTA',
+    headers: ['Tarih', 'Vade Tarihi', 'Fiş No', 'Açıklama', 'Borç Tut.', 'Alac.Tut.'],
+    rows: debtorRows.map((row) => ({
+      Tarih: row[0],
+      'Vade Tarihi': row[1] || null,
+      'Fiş No': row[2],
+      Açıklama: row[3],
+      'Borç Tut.': row[4],
+      'Alac.Tut.': row[5],
+    })),
+  };
+
+  return { creditor, debtor };
+}

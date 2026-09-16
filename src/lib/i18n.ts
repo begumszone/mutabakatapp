@@ -27,6 +27,7 @@ const tr: Dict = {
   'upload.partyName': 'Firma adı',
   'upload.continue': 'Devam et',
   'upload.sample': 'Örnek veriyle dene',
+  'upload.samplePeriod': 'Dönem uyuşmazlığı örneği',
   'upload.bothNeeded': 'Mutabakat için iki tarafın da ekstresi gerekiyor.',
 
   'mapping.sheet': 'Sayfa',
@@ -106,6 +107,11 @@ const tr: Dict = {
   'result.export': 'Sonuç tablosunu indir (.xlsx)',
   'result.restart': 'Yeni mutabakat',
   'result.explanation': 'Açıklama',
+  'result.period': 'Karşılaştırılan dönem',
+  'result.periodMisaligned':
+    '{creditor}: {creditorStart} – {creditorEnd}  ·  {debtor}: {debtorStart} – {debtorEnd}. Karşılaştırma yalnızca ortak dönem üzerinden yapıldı.',
+  'result.periodOutside':
+    'Ortak dönemin dışında kalan {count} kayıt karşılaştırmaya alınmadı — karşı taraf o dönemi göndermediği için eksik sayılamazlar.',
 
   'table.date': 'Tarih',
   'table.docNo': 'Belge no',
@@ -158,6 +164,10 @@ const tr: Dict = {
     '{docNo} numaralı belgede iki tarafın tutarı %{percent} farklı — iki taraf aynı dövizli faturayı farklı kurdan çevirmiş olabilir. Kullanılan kurları karşılaştırın ve kur farkı faturası kesilmesi gerekip gerekmediğine bakın.',
   'action.overdue':
     '{docNo} numaralı fatura {days} gündür vadesi geçmiş (vade {dueDate}). {debtor} tarafından tahsilat takibi yapılmalı.',
+  'action.periodGap':
+    'İki ekstre farklı dönemleri kapsıyor. Ortak dönem {commonStart} tarihinde başlıyor ve o tarihteki devirler tutmuyor: {creditor} {creditorOpening}, {debtor} {debtorOpening} — arada {difference} fark var. Bu fark ortak dönemden ÖNCE oluşmuş, dolayısıyla eldeki verilerle açıklanamaz. {shortParty} firmasından {neededFrom} tarihinden itibaren ekstre isteyin.',
+  'action.missingOpening':
+    '{party} ekstresinde devir (açılış bakiyesi) satırı yok; {date} devri sıfır kabul edildi. Devir varsa mutabakat ayarlarından elle girin, yoksa sonuç yanıltıcı olur.',
   'action.unappliedPayment':
     '{count} tahsilat hiçbir faturaya kapatılamadı. Avans olabilir ya da eksik fatura kaydına işaret ediyor olabilir.',
 
@@ -190,6 +200,7 @@ const en: Dict = {
   'upload.partyName': 'Company name',
   'upload.continue': 'Continue',
   'upload.sample': 'Try it with sample data',
+  'upload.samplePeriod': 'Mismatched-period example',
   'upload.bothNeeded': 'Reconciliation needs a statement from both sides.',
 
   'mapping.sheet': 'Sheet',
@@ -269,6 +280,11 @@ const en: Dict = {
   'result.export': 'Download the result table (.xlsx)',
   'result.restart': 'New reconciliation',
   'result.explanation': 'Explanation',
+  'result.period': 'Period compared',
+  'result.periodMisaligned':
+    '{creditor}: {creditorStart} – {creditorEnd}  ·  {debtor}: {debtorStart} – {debtorEnd}. Only the overlap was compared.',
+  'result.periodOutside':
+    '{count} records fall outside the overlap and were left out — the other side never sent those months, so their absence proves nothing.',
 
   'table.date': 'Date',
   'table.docNo': 'Document no',
@@ -321,6 +337,10 @@ const en: Dict = {
     'On document {docNo} the two amounts differ by {percent}% — most likely the same foreign-currency invoice converted at two different rates. Compare the rates used and check whether an FX difference invoice is needed.',
   'action.overdue':
     'Invoice {docNo} is {days} days past due (due {dueDate}). {debtor} should be chased for payment.',
+  'action.periodGap':
+    'The two statements cover different periods. The overlap begins on {commonStart} and the balances carried into it do not agree: {creditor} {creditorOpening}, {debtor} {debtorOpening} — a gap of {difference}. That gap arose BEFORE the overlap, so nothing in the data can explain it. Ask {shortParty} for a statement from {neededFrom}.',
+  'action.missingOpening':
+    '{party}’s statement carries no opening (devir) line, so the balance at {date} was taken as zero. If there is an opening, enter it in the settings — otherwise the result is misleading.',
   'action.unappliedPayment':
     '{count} payments could not be applied to any invoice. They may be advances, or point to invoices never booked.',
 

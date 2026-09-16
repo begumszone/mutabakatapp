@@ -10,10 +10,12 @@ function localeTag(locale: Locale): string {
 
 /** Money, in the convention of the chosen interface language. */
 export function formatMoney(value: number, locale: Locale, currency?: string): string {
+  // A value that only rounds to zero should print as zero, not as "-0,00".
+  const safe = Object.is(value, -0) || Math.abs(value) < 0.005 ? 0 : value;
   const text = new Intl.NumberFormat(localeTag(locale), {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(value);
+  }).format(safe);
   if (!currency) return text;
   const symbol = CURRENCY_SYMBOLS[currency.toUpperCase()] ?? currency;
   return `${text} ${symbol}`;

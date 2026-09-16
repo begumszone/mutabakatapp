@@ -11,6 +11,7 @@ import { foldText, normalizeDocNo, normalizeDocNoLoose } from '../core/normalize
 import { parseAmount, round2 } from '../core/parseNumber';
 import { parseDate } from '../core/parseDate';
 import { suggestPerspective } from '../core/claim';
+import type { Period } from '../types';
 
 /** Footer wording that must never be read as a ledger line. */
 const FOOTER = /(genel toplam|toplam tutarlar|^toplam$|^ara toplam|grand total|^total$)/;
@@ -148,6 +149,7 @@ export function makeStatement(
   ownerPartyId: string,
   counterpartyPartyId: string,
   perspective: Perspective,
+  statedPeriod: Period | null = null,
 ): Statement {
   const counts = new Map<string, number>();
   for (const entry of entries) {
@@ -171,5 +173,6 @@ export function makeStatement(
     perspective,
     currency,
     entries,
+    statedPeriod,
   };
 }

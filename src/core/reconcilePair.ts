@@ -9,8 +9,9 @@ import type {
 import { allocatePayments } from './allocate';
 import { buildActions } from './actions';
 import { matchStatements } from './matchEntries';
+import { alignPeriods } from './period';
 import { selectOpenItems } from './openItems';
-import { buildBridge, openingBalance } from './reconcile';
+import { buildBridge } from './reconcile';
 
 export const DEFAULT_SETTINGS: ReconciliationSettings = {
   amountTolerance: 0.01,
@@ -53,13 +54,25 @@ export function reconcilePair(
   debtorStatement: Statement,
   settings: ReconciliationSettings,
 ): PairReconciliation {
-  const fullMatch = matchStatements(creditorStatement, debtorStatement, settings);
+  // Time first. Two statements can only be compared where they overlap, and
+  // what each side carried into that overlap has to be settled before any
+  // document inside it means anything.
+  const { alignment, creditor: creditorSplit, debtor: debtorSplit } = alignPeriods(
+    creditorStatement,
+    debtorStatement,
+    settings.amountTolerance,
+    !settings.openItemsOnly,
+  );
+  const creditorInPeriod: Statement = { ...creditorStatement, entries: creditorSplit.inside };
+  const debtorInPeriod: Statement = { ...debtorStatement, entries: debtorSplit.inside };
+
+  const fullMatch = matchStatements(creditorInPeriod, debtorInPeriod, settings);
 
   const view = settings.openItemsOnly
-    ? selectOpenItems(creditorStatement, debtorStatement, fullMatch)
+    ? selectOpenItems(creditorInPeriod, debtorInPeriod, fullMatch)
     : {
-        creditorStatement,
-        debtorStatement,
+        creditorStatement: creditorInPeriod,
+        debtorStatement: debtorInPeriod,
         match: fullMatch,
         excluded: NOTHING_EXCLUDED,
       };
@@ -70,8 +83,9 @@ export function reconcilePair(
     view.match,
     settings.amountTolerance,
     {
-      creditor: openingBalance(creditorStatement),
-      debtor: openingBalance(debtorStatement),
+      creditor: creditorSplit.opening,
+      debtor: debtorSplit.opening,
+      includeInBalance: !settings.openItemsOnly,
     },
   );
 
@@ -94,6 +108,7 @@ export function reconcilePair(
     bridge,
     allocation,
     materiality,
+    period: alignment,
   });
 
   return {
@@ -108,5 +123,6 @@ export function reconcilePair(
     actions,
     asOfDate: settings.asOfDate,
     excluded: view.excluded,
+    period: alignment,
   };
 }

@@ -141,6 +141,31 @@ export function ResultView({ locale, result, onRestart }: Props) {
 
       {!bridge.reconciles && <div className="notice error">{t('result.bridgeBroken')}</div>}
 
+      {result.period.misaligned && result.period.common && (
+        <div className="notice">
+          <strong>{t('result.period')}: </strong>
+          {formatDate(result.period.common.start, locale)} – {formatDate(result.period.common.end, locale)}
+          {'. '}
+          {result.period.creditorPeriod && result.period.debtorPeriod &&
+            t('result.periodMisaligned', {
+              creditor: creditor.name,
+              creditorStart: result.period.creditorPeriod.start,
+              creditorEnd: result.period.creditorPeriod.end,
+              debtor: debtor.name,
+              debtorStart: result.period.debtorPeriod.start,
+              debtorEnd: result.period.debtorPeriod.end,
+            })}
+          {result.period.creditorOutside + result.period.debtorOutside > 0 && (
+            <>
+              {' '}
+              {t('result.periodOutside', {
+                count: result.period.creditorOutside + result.period.debtorOutside,
+              })}
+            </>
+          )}
+        </div>
+      )}
+
       {result.excluded.active && (
         <div className="notice info">
           {t('result.excluded', {

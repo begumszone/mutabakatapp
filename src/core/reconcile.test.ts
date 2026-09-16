@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { Party, ReconciliationSettings, Statement, StatementEntry } from '../types';
 import { normalizeDocNo, normalizeDocNoLoose } from './normalize';
-import { parseAmount } from './parseNumber';
+import { parseAmount, round2 } from './parseNumber';
+import { formatMoney } from '../lib/formatters';
 import { parseDate } from './parseDate';
 import { claimOf, orientEntries, statementBalance } from './claim';
 import { reconcilePair } from './reconcilePair';
@@ -42,6 +43,7 @@ function statement(id: string, perspective: 'receivable' | 'payable', entries: S
     perspective,
     currency: 'TRY',
     entries,
+    statedPeriod: null,
   };
 }
 
@@ -330,5 +332,17 @@ describe('payment allocation and ageing', () => {
     expect(invoice.dueDateSource).toBe('term');
     expect(invoice.dueDate).toBe('2026-09-14');
     expect(invoice.daysOverdue).toBe(0);
+  });
+});
+
+describe('presentation of figures that cancel', () => {
+  it('never reports a negative zero', () => {
+    // Real in IEEE arithmetic, and a difference somebody goes looking for.
+    expect(Object.is(round2(-0.001), 0)).toBe(true);
+    expect(Object.is(round2(-0), 0)).toBe(true);
+    expect(formatMoney(-0, 'tr')).toBe('0,00');
+    expect(formatMoney(round2(0.0001 - 0.0002), 'tr')).toBe('0,00');
+    // A real small amount still shows its sign.
+    expect(formatMoney(-0.01, 'tr')).toBe('-0,01');
   });
 });

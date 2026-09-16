@@ -70,6 +70,7 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
         perspective: build.suggestedPerspective,
         currency: 'TRY',
         entries: build.entries,
+        statedPeriod: null,
       }),
     ).toBe(486418.22);
 
@@ -141,6 +142,7 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
       perspective,
       currency: 'TRY',
       entries,
+      statedPeriod: null,
     });
 
     const settings: ReconciliationSettings = {
@@ -187,6 +189,16 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
     // double-count what the open-item reading just removed.
     expect(result.bridge.debtorOpening).toBe(443353.36);
     expect(result.excluded.active).toBe(true);
-    expect(result.excluded.creditorSettled).toBe(135);
+
+    // The customer's ledger begins on 1 January and says so with a devir, so
+    // the supplier's three 2025-dated adjustment rows sit before the window
+    // both sides can speak to. They are folded into what the supplier carried
+    // in rather than compared against months the customer never sent.
+    expect(result.period.common?.start).toBe('2026-01-01');
+    expect(result.period.misaligned).toBe(true);
+    expect(result.excluded.creditorSettled).toBe(132);
+    // Neither side is short: the overlap starts where the customer's ledger
+    // does, and nothing before it is in dispute.
+    expect(result.period.shortSide).toBeNull();
   });
 });

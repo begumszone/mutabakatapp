@@ -74,6 +74,12 @@ export interface StatementEntry {
  */
 export type Perspective = 'receivable' | 'payable';
 
+/** A closed date range, inclusive at both ends. */
+export interface Period {
+  start: string;
+  end: string;
+}
+
 /** One uploaded cari hesap ekstresi. */
 export interface Statement {
   id: string;
@@ -85,6 +91,12 @@ export interface Statement {
   perspective: Perspective;
   currency: string;
   entries: StatementEntry[];
+  /**
+   * The period the export says it covers. Taken from the ekstre's own header
+   * block where it states one, which is better evidence than the first and
+   * last dates that happen to appear in the rows.
+   */
+  statedPeriod: Period | null;
 }
 
 /** How a pair of entries came to be considered the same document. */
@@ -186,6 +198,38 @@ export interface ExcludedSummary {
   openingLines: number;
 }
 
+/**
+ * How the two statements line up in time, and what that costs.
+ *
+ * Two ekstre almost never cover the same window. One side sends the year to
+ * date, the other sends the last three months, and the two closing balances
+ * are then not comparable at all until the earlier part is accounted for.
+ * This records the overlap the reconciliation can actually be run over, what
+ * each side carries into it, and — when that carried-in figure does not
+ * agree — which statement has to be asked for to explain the rest.
+ */
+export interface PeriodAlignment {
+  creditorPeriod: Period | null;
+  debtorPeriod: Period | null;
+  /** The window both statements cover, which is where documents are compared. */
+  common: Period | null;
+  /** True when the two statements cover different windows. */
+  misaligned: boolean;
+  /** Each side's balance as it enters the common period. */
+  creditorOpening: number;
+  debtorOpening: number;
+  openingDifference: number;
+  /** The side whose statement starts later, when they differ. */
+  shortSide: 'creditor' | 'debtor' | null;
+  /** The date that side's statement is needed from. */
+  neededFrom: string | null;
+  /** Lines set aside for falling outside the common window. */
+  creditorOutside: number;
+  debtorOutside: number;
+  /** Sides that state no devir at all, so their opening was taken as zero. */
+  assumedZeroOpening: ('creditor' | 'debtor')[];
+}
+
 export type AgingBucket = 'notDue' | 'd1to30' | 'd31to60' | 'd61to90' | 'd90plus';
 
 /** An invoice after payments have been allocated against it. */
@@ -223,6 +267,8 @@ export type ActionCategory =
   | 'overdue'
   | 'dueSoon'
   | 'unappliedPayment'
+  | 'periodGap'
+  | 'missingOpening'
   | 'balanceAgreed';
 
 /** A concrete next step, addressed to a named party. */
@@ -274,6 +320,8 @@ export interface PairReconciliation {
   asOfDate: string;
   /** What was set aside as already settled, and why the totals look smaller. */
   excluded: ExcludedSummary;
+  /** How the two statements line up in time. */
+  period: PeriodAlignment;
 }
 
 // ---------------------------------------------------------------------------

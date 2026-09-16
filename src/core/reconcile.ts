@@ -34,7 +34,20 @@ export function buildBridge(
    * the result's own Devir row, where a gap between the two means somebody
    * should ask for a statement covering the earlier period.
    */
-  openings?: { creditor: number; debtor: number },
+  openings?: {
+    creditor: number;
+    debtor: number;
+    /**
+     * Whether the carried-forward figures form part of the balances.
+     *
+     * Rolling a window forward, they do: the closing balance is what was
+     * carried in plus what moved. Comparing open items, they must not — the
+     * devir *is* the settled history in one figure, and the settled lines it
+     * stands for have already been taken out, so adding it back would count
+     * the same money twice.
+     */
+    includeInBalance: boolean;
+  },
 ): BalanceBridge {
   let creditorBalance = 0;
   for (const entry of creditorStatement.entries) {
@@ -44,8 +57,15 @@ export function buildBridge(
   for (const entry of debtorStatement.entries) {
     debtorBalance += claimOf(entry, debtorStatement.perspective);
   }
+  const creditorOpening = openings?.creditor ?? openingBalance(creditorStatement);
+  const debtorOpening = openings?.debtor ?? openingBalance(debtorStatement);
+  if (openings?.includeInBalance) {
+    creditorBalance += creditorOpening;
+    debtorBalance += debtorOpening;
+  }
   creditorBalance = round2(creditorBalance);
   debtorBalance = round2(debtorBalance);
+  const openingDifference = round2(creditorOpening - debtorOpening);
 
   let amountDifferences = 0;
   for (const pair of match.pairs) amountDifferences += pair.amountDifference;
@@ -60,14 +80,19 @@ export function buildBridge(
   debtorOnlyTotal = round2(debtorOnlyTotal);
 
   const difference = round2(creditorBalance - debtorBalance);
-  const explained = round2(amountDifferences + creditorOnlyTotal - debtorOnlyTotal);
+  // Nothing else can move a balance: what each side carried in, the documents
+  // only one of them booked, and the ones they booked at two different
+  // figures.
+  const explained = round2(
+    (openings?.includeInBalance ? openingDifference : 0) +
+      amountDifferences +
+      creditorOnlyTotal -
+      debtorOnlyTotal,
+  );
 
   // Each side, once the records it never booked are put back on it.
   const creditorAdjusted = round2(creditorBalance + debtorOnlyTotal);
   const debtorAdjusted = round2(debtorBalance + creditorOnlyTotal);
-
-  const creditorOpening = openings?.creditor ?? openingBalance(creditorStatement);
-  const debtorOpening = openings?.debtor ?? openingBalance(debtorStatement);
 
   const residual = round2(creditorAdjusted - debtorAdjusted);
 
@@ -77,7 +102,7 @@ export function buildBridge(
     difference,
     creditorOpening,
     debtorOpening,
-    openingDifference: round2(creditorOpening - debtorOpening),
+    openingDifference,
     amountDifferences,
     creditorOnlyTotal,
     debtorOnlyTotal,
@@ -85,6 +110,11 @@ export function buildBridge(
     debtorAdjusted,
     residual,
     reconciles: Math.abs(difference - explained) <= tolerance,
-    agreed: Math.abs(residual) <= tolerance && Math.abs(amountDifferences) <= tolerance,
+    agreed:
+      Math.abs(residual) <= tolerance &&
+      Math.abs(amountDifferences) <= tolerance &&
+      // A gap in what the two sides carried in is a real disagreement, even
+      // when every document inside the window lines up.
+      (!openings?.includeInBalance || Math.abs(openingDifference) <= tolerance),
   };
 }

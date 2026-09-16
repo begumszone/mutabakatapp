@@ -5,6 +5,7 @@ import type {
   MatchResult,
   MatchedPair,
   Party,
+  PeriodAlignment,
   RecommendedAction,
 } from '../types';
 import { round2 } from './parseNumber';
@@ -96,6 +97,7 @@ export interface ActionInput {
   allocation: AllocationResult;
   /** Differences at or above this size are worth a phone call. */
   materiality: number;
+  period: PeriodAlignment;
 }
 
 /**
@@ -108,8 +110,46 @@ export interface ActionInput {
  * an empty list.
  */
 export function buildActions(input: ActionInput): RecommendedAction[] {
-  const { creditor, debtor, match, bridge, allocation, materiality } = input;
+  const { creditor, debtor, match, bridge, allocation, materiality, period } = input;
   const actions: RecommendedAction[] = [];
+
+  // Before anything inside the window: can the window be trusted at all?
+  if (period.shortSide && period.neededFrom) {
+    const short = period.shortSide === 'creditor' ? creditor : debtor;
+    actions.push({
+      id: 'period-gap',
+      severity: 'critical',
+      category: 'periodGap',
+      ownerPartyId: short.id,
+      amount: period.openingDifference,
+      messageKey: 'action.periodGap',
+      messageVars: {
+        shortParty: short.name,
+        neededFrom: period.neededFrom,
+        commonStart: period.common?.start ?? '',
+        creditorOpening: period.creditorOpening,
+        debtorOpening: period.debtorOpening,
+        difference: period.openingDifference,
+        creditor: creditor.name,
+        debtor: debtor.name,
+      },
+      entryIds: [],
+    });
+  }
+
+  for (const side of period.assumedZeroOpening) {
+    const party = side === 'creditor' ? creditor : debtor;
+    actions.push({
+      id: `no-opening-${side}`,
+      severity: 'warning',
+      category: 'missingOpening',
+      ownerPartyId: party.id,
+      amount: 0,
+      messageKey: 'action.missingOpening',
+      messageVars: { party: party.name, date: period.common?.start ?? '' },
+      entryIds: [],
+    });
+  }
 
   if (bridge.agreed) {
     actions.push({
