@@ -28,6 +28,44 @@ const tr: Dict = {
   'upload.continue': 'Devam et',
   'upload.sample': 'Örnek veriyle dene',
   'upload.samplePeriod': 'Dönem uyuşmazlığı örneği',
+  'upload.downloadSample': 'Örnek cari hesap ekstresi indir (.xlsx)',
+  'how.title': 'Nasıl kullanılır',
+  'how.lead':
+    'Mutabakat, aynı ilişkiyi tutan iki defteri karşılaştırmaktır: sizin defteriniz ve karşı firmanın defteri. Aşağıdaki beş adım, daha önce hiç mutabakat yapmamış biri için yazıldı.',
+  'how.s1': 'İki tarafın da ekstresini toplayın',
+  'how.s1b':
+    'Muhasebe programınızdan ilgili carinin “cari hesap ekstresi” ya da “muavin defter” dökümünü Excel olarak alın. Aynısını karşı firmadan isteyin. İkisi aynı dönemi kapsıyorsa en iyisi; kapsamıyorsa uygulama bunu kendisi fark eder ve hangi tarihten itibaren ekstre istemeniz gerektiğini yazar.',
+  'how.s2': 'Hangisi alacaklı, hangisi borçlu belirleyin',
+  'how.s2b':
+    'Faturayı kesen, yani mal veya hizmeti veren taraf alacaklıdır — soldaki A kutusu. Ödemeyi yapan taraf borçludur — sağdaki B kutusu. Emin değilseniz tek soru yeter: kim kime hizmet veriyor? Veren taraf A’dır.',
+  'how.s3': 'Dosyaları sürükleyin',
+  'how.s3b':
+    'Başlıkları düzeltmeniz, satır silmeniz, Excel’i yeniden düzenlemeniz gerekmez. Uygulama sayfayı, başlık satırının kaçıncı satırda olduğunu ve hangi kolonun ne olduğunu kendisi bulur; ekstrenin üstündeki firma adı, vergi numarası ve dönem bilgisini de oradan okur.',
+  'how.s4': 'Uygulamanın anladığını kontrol edin',
+  'how.s4b':
+    'İkinci adımda ne anladığını size gösterir: hangi kolonu tarih saydı, hangisini borç, ekstreyi hangi taraftan yazılmış kabul etti. Yanlış olanı açılır listeden düzeltin. Buradaki bir hata küçük bir hata değildir — kendinden emin ve yanlış bir mutabakat üretir, o yüzden hiçbir tahmin sessizce uygulanmaz.',
+  'how.s5': 'Sonucu okuyun ve indirin',
+  'how.s5b':
+    'Üstte iki firmanın bakiyesi ve aradaki fark durur. Altında farkın her kalemi, sebebi ve kimin ne yapması gerektiği yazar. “Sonuç tablosunu indir” ile hepsini Excel olarak alır, karşı tarafa gönderirsiniz.',
+  'how.termsTitle': 'Geçen terimler',
+  'how.t1': 'Devir',
+  'how.t1b': 'Dönem başındaki bakiye. Ekstrenin ilk satırında “DEVİR”, “Açılış Fişi” ya da “Nakli Yekün” diye geçer; öncesinde olan biten her şeyin tek rakama inmiş hâlidir.',
+  'how.t2': 'Açık kalem',
+  'how.t2b': 'Henüz ödenmemiş, kapanmamış fatura. Bazı ERP’ler ekstrede hangi faturanın hangi ödemeyle kapandığını yazar; uygulama bunu görürse karşılaştırmayı yalnızca açık kalemler üzerinden yapar.',
+  'how.t3': 'Eksik kayıt',
+  'how.t3b': 'Bir tarafın deftere işlediği, diğerinin işlemediği belge. Mutabakatsızlığın en sık sebebidir ve çözümü genelde belgeyi karşı tarafa gönderip kaydettirmektir.',
+  'how.t4': 'Kur farkı',
+  'how.t4b': 'Dövizli bir faturayı iki tarafın farklı kurdan çevirmesi. Tutarlar yüzde birkaç oynar; uygulama oranı hesaplayıp bunun kur kaynaklı olabileceğini söyler.',
+  'what.title': 'Yüklediğinizde ne çıkar',
+  'what.bridge': 'Bakiye köprüsü',
+  'what.bridgeBody':
+    'İki bakiye arasındaki farkın tamamını kalem kalem açıklar. Farklar açığı birebir açıklamıyorsa “tuttu” demez, tutmadığını söyler.',
+  'what.cause': 'Farkın sebebi',
+  'what.causeBody':
+    'Kur farkı mı, KDV mi, karşı tarafın işlemediği bir kayıt mı, yoksa dönem kayması mı — adını koyar. Dövizli faturada iki tarafın kullandığı kuru hesaplar.',
+  'what.action': 'Alınacak aksiyon',
+  'what.actionBody':
+    'Kimin ne yapması gerektiğini tutara ve gecikmeye göre sıralar. Vadesi geçmiş faturaları, toplu tahsilatları kapatarak yaşlandırır.',
   'upload.bothNeeded': 'Mutabakat için iki tarafın da ekstresi gerekiyor.',
 
   'mapping.sheet': 'Sayfa',
@@ -201,6 +239,44 @@ const en: Dict = {
   'upload.continue': 'Continue',
   'upload.sample': 'Try it with sample data',
   'upload.samplePeriod': 'Mismatched-period example',
+  'upload.downloadSample': 'Download a sample statement (.xlsx)',
+  'how.title': 'How to use it',
+  'how.lead':
+    'Reconciliation means comparing two ledgers of the same relationship: yours and the other firm’s. These five steps are written for somebody who has never done one.',
+  'how.s1': 'Get both sides’ statements',
+  'how.s1b':
+    'Export the counterparty’s account statement — the cari hesap ekstresi or muavin defter — from your accounting system as Excel, and ask the other firm for theirs. Covering the same period is ideal; where they do not, the app notices and tells you which statement to ask for and from what date.',
+  'how.s2': 'Work out which side is the creditor',
+  'how.s2b':
+    'Whoever raises the invoice — the side supplying the goods or service — is the creditor, box A on the left. The side paying is the debtor, box B on the right. One question settles it: who is serving whom? The one serving is A.',
+  'how.s3': 'Drop the files in',
+  'how.s3b':
+    'You do not need to fix headings, delete rows, or rearrange the spreadsheet. The app finds the sheet, the header row and what each column is, and reads the firm, tax number and period out of the block above the table.',
+  'how.s4': 'Check what it understood',
+  'how.s4b':
+    'Step two shows you its reading: which column it took for the date, which for debit, which side the statement is written from. Correct anything wrong from the dropdowns. A wrong guess here is not a small error — it produces a confident, wrong reconciliation, which is why nothing is applied silently.',
+  'how.s5': 'Read the result and download it',
+  'how.s5b':
+    'The two balances and the gap between them sit at the top. Below that, every difference, its cause, and who has to do what. “Download the result table” gives you all of it as Excel to send to the other side.',
+  'how.termsTitle': 'Terms used here',
+  'how.t1': 'Devir (opening)',
+  'how.t1b': 'The balance at the start of the period. It appears on the first line as “DEVİR”, “Açılış Fişi” or “Nakli Yekün” — everything that happened before, in one figure.',
+  'how.t2': 'Open item',
+  'how.t2b': 'An invoice not yet settled. Some ERPs record which payment closed which invoice; where the app sees that, it compares open items only.',
+  'how.t3': 'Missing record',
+  'how.t3b': 'A document one side booked and the other did not. The commonest cause of a disagreement, and usually fixed by sending the document over to be booked.',
+  'how.t4': 'FX difference',
+  'how.t4b': 'The same foreign-currency invoice converted at two different rates. The amounts differ by a few percent; the app works out the ratio and says it may be the rate.',
+  'what.title': 'What you get back',
+  'what.bridge': 'A balance bridge',
+  'what.bridgeBody':
+    'Every lira of the gap between the two balances, accounted for. If the differences do not add up to the gap, it says so rather than claiming agreement.',
+  'what.cause': 'The cause of each difference',
+  'what.causeBody':
+    'FX, VAT, a record the other side never booked, or a cut-off difference — named, not merely reported. For a foreign-currency invoice it works out the rate each side used.',
+  'what.action': 'What to do about it',
+  'what.actionBody':
+    'Who has to act, ordered by money and by how late it is. Overdue invoices are aged after bulk payments have been applied against them.',
   'upload.bothNeeded': 'Reconciliation needs a statement from both sides.',
 
   'mapping.sheet': 'Sheet',

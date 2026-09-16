@@ -22,6 +22,7 @@ import { hasClearingInformation, reconcilePair } from './core/reconcilePair';
 import { todayIso } from './core/parseDate';
 import { useTheme } from './hooks/useTheme';
 import { FileDrop } from './components/FileDrop';
+import { buildSampleWorkbook, sampleWorkbookName, type SampleSide } from './lib/sampleWorkbook';
 import { SideSetup, type SourceView } from './components/SideSetup';
 import { ResultView } from './components/ResultView';
 
@@ -393,6 +394,24 @@ export function App() {
     setStep('result');
   };
 
+  /**
+   * Hands over a sample ekstre as a real file.
+   *
+   * Loading the built-in example shows what the app does; downloading the
+   * file it was built from shows what the app *expects*, which is the
+   * question somebody evaluating it actually has. The file that comes down
+   * can be dropped straight back in.
+   */
+  const downloadSample = async (side: SampleSide) => {
+    const blob = await buildSampleWorkbook(side);
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = sampleWorkbookName(side);
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   const restart = () => {
     setCreditorSide(EMPTY_SIDE);
     setDebtorSide(EMPTY_SIDE);
@@ -420,7 +439,7 @@ export function App() {
                 }
               >
                 <span className="dot">{index < stepIndex ? '✓' : index + 1}</span>
-                {label}
+                <span className="step-label">{label}</span>
               </span>
             </span>
           ))}
@@ -475,11 +494,54 @@ export function App() {
                         onFile={(file) => void addFile(file, which, true)}
                         onClear={() => setSide(EMPTY_SIDE)}
                       />
+                      <button
+                        className="ghost small"
+                        type="button"
+                        style={{ alignSelf: 'flex-start' }}
+                        onClick={() => void downloadSample(which)}
+                      >
+                        ↓ {t('upload.downloadSample')}
+                      </button>
                     </div>
                   </section>
                 );
               })}
             </div>
+
+            <section className="how">
+              <h2>{t('how.title')}</h2>
+              <p className="how-lead">{t('how.lead')}</p>
+              <ol className="how-steps">
+                {(['s1', 's2', 's3', 's4', 's5'] as const).map((key) => (
+                  <li key={key}>
+                    <h3>{t(`how.${key}`)}</h3>
+                    <p>{t(`how.${key}b`)}</p>
+                  </li>
+                ))}
+              </ol>
+
+              <h3 className="how-terms-title">{t('how.termsTitle')}</h3>
+              <dl className="how-terms">
+                {(['t1', 't2', 't3', 't4'] as const).map((key) => (
+                  <div key={key}>
+                    <dt>{t(`how.${key}`)}</dt>
+                    <dd>{t(`how.${key}b`)}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+
+            <section className="what">
+              <h2>{t('what.title')}</h2>
+              <div className="what-grid">
+                {(['bridge', 'cause', 'action'] as const).map((key) => (
+                  <div className="what-item" key={key}>
+                    <h3>{t(`what.${key}`)}</h3>
+                    <p className="small muted">{t(`what.${key}Body`)}</p>
+                  </div>
+                ))}
+              </div>
+            </section>
 
             <div className="row">
               <button
