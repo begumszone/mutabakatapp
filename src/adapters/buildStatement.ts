@@ -118,6 +118,7 @@ export function buildStatement(file: ParsedFile, mapping: ColumnMapping): BuildR
         debit,
         credit,
         currency,
+        clearingDoc: text(row, mapping.clearingDoc),
       },
     });
   });

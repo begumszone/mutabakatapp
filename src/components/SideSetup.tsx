@@ -40,6 +40,7 @@ const TEXT_FIELDS: (keyof ColumnMapping)[] = [
   'docNoAlt',
   'description',
   'currency',
+  'clearingDoc',
 ];
 
 function SourceCard({

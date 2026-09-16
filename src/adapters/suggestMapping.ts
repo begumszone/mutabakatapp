@@ -109,6 +109,15 @@ const FIELDS: Record<string, FieldSpec> = {
     ],
     exclude: ['bak', 'balance', 'bakiye', 'toplam'],
   },
+  clearingDoc: {
+    candidates: [
+      { needle: 'clearing document', score: 10 },
+      { needle: 'kapanis belgesi', score: 10 },
+      { needle: 'kapatma belgesi', score: 10 },
+      { needle: 'clearing doc', score: 9 },
+      { needle: 'clearing', score: 7 },
+    ],
+  },
   currency: {
     candidates: [
       { needle: 'dvz cinsi', score: 10 },
@@ -236,6 +245,7 @@ export function suggestMapping(file: ParsedFile): ColumnMapping {
     credit,
     amount,
     currency: rank(headers, FIELDS.currency)[0] ?? null,
+    clearingDoc: rank(headers, FIELDS.clearingDoc)[0] ?? null,
   };
 }
 

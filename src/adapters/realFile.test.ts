@@ -6,6 +6,8 @@ import { suggestMapping } from './suggestMapping';
 import { buildStatement } from './buildStatement';
 import { statementBalance } from '../core/claim';
 import { parseAmount } from '../core/parseNumber';
+import { reconcilePair } from '../core/reconcilePair';
+import type { Party, ReconciliationSettings, Statement } from '../types';
 
 /**
  * Regression test against a real customer export.
@@ -110,5 +112,81 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
     // before it begins.
     expect(Math.round(open * 100) / 100).toBe(501717.37);
     expect(Math.round(all * 100) / 100).toBe(30467.42);
+  });
+
+  it('reconciles the two ledgers to the figures the two firms signed off', async () => {
+    const workbook = await loadWorkbook();
+
+    const build = (sheetIndex: number, headerRow: number) => {
+      const parsed = sheetToParsedFile(workbook, sheetIndex, headerRow);
+      const mapping = suggestMapping(parsed);
+      return { parsed, mapping, result: buildStatement(parsed, mapping) };
+    };
+
+    const air = build(0, 0);
+    const akvatek = build(3, 4);
+
+    // The SAP sheet is the one that says which of its lines are closed.
+    expect(air.mapping.clearingDoc).toBe('Clearing Document');
+
+    const statement = (
+      id: string,
+      entries: Statement['entries'],
+      perspective: Statement['perspective'],
+    ): Statement => ({
+      id,
+      fileName: id,
+      ownerPartyId: id,
+      counterpartyPartyId: id === 'a' ? 'b' : 'a',
+      perspective,
+      currency: 'TRY',
+      entries,
+    });
+
+    const settings: ReconciliationSettings = {
+      amountTolerance: 0.01,
+      dayTolerance: 7,
+      allowDateAmountFallback: true,
+      openItemsOnly: true,
+      termDays: 30,
+      asOfDate: '2026-08-31',
+    };
+
+    const airLiquide: Party = { id: 'a', name: 'AİR LIQUIDE', taxId: null };
+    const akvatekSu: Party = { id: 'b', name: 'AKVATEK SU', taxId: null };
+
+    const result = reconcilePair(
+      airLiquide,
+      akvatekSu,
+      statement('a', air.result.entries, 'receivable'),
+      statement('b', akvatek.result.entries, akvatek.result.suggestedPerspective),
+      settings,
+    );
+
+    // The supplier's own reported balance, reproduced from its open items.
+    expect(result.bridge.creditorBalance).toBe(501717.37);
+    // And the customer's copy of those same eight documents.
+    expect(result.bridge.debtorBalance).toBe(501717.36);
+    expect(result.bridge.difference).toBe(0.01);
+
+    // The whole gap is one invoice booked a kuruş apart — which is exactly
+    // the unexplained "-0,01" carried in the firms' hand-made SONUÇ TABLOSU.
+    const mismatches = result.match.pairs.filter((pair) => Math.abs(pair.amountDifference) >= 0.005);
+    expect(mismatches).toHaveLength(1);
+    expect(mismatches[0].creditorEntry.docNo).toBe('AL42026000005577');
+    expect(mismatches[0].amountDifference).toBe(0.01);
+
+    // Nothing else is left over on either side, and the bridge proves it.
+    expect(result.match.creditorOnly).toHaveLength(0);
+    expect(result.match.debtorOnly).toHaveLength(0);
+    expect(result.bridge.reconciles).toBe(true);
+    expect(result.bridge.agreed).toBe(true);
+
+    // The devir still gets reported, even though it was set aside: it is the
+    // settled history in one figure, and comparing it as a document would
+    // double-count what the open-item reading just removed.
+    expect(result.bridge.debtorOpening).toBe(443353.36);
+    expect(result.excluded.active).toBe(true);
+    expect(result.excluded.creditorSettled).toBe(135);
   });
 });

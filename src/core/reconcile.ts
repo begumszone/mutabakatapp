@@ -27,6 +27,14 @@ export function buildBridge(
   debtorStatement: Statement,
   match: MatchResult,
   tolerance = 0.01,
+  /**
+   * Devir figures, which are read from the *unfiltered* ledgers. Under the
+   * open-item reading the opening lines are removed before the comparison —
+   * a devir is the settled history in one figure — but they still belong on
+   * the result's own Devir row, where a gap between the two means somebody
+   * should ask for a statement covering the earlier period.
+   */
+  openings?: { creditor: number; debtor: number },
 ): BalanceBridge {
   let creditorBalance = 0;
   for (const entry of creditorStatement.entries) {
@@ -58,8 +66,8 @@ export function buildBridge(
   const creditorAdjusted = round2(creditorBalance + debtorOnlyTotal);
   const debtorAdjusted = round2(debtorBalance + creditorOnlyTotal);
 
-  const creditorOpening = openingBalance(creditorStatement);
-  const debtorOpening = openingBalance(debtorStatement);
+  const creditorOpening = openings?.creditor ?? openingBalance(creditorStatement);
+  const debtorOpening = openings?.debtor ?? openingBalance(debtorStatement);
 
   const residual = round2(creditorAdjusted - debtorAdjusted);
 

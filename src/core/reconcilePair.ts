@@ -1,23 +1,50 @@
-import type { PairReconciliation, Party, ReconciliationSettings, Statement } from '../types';
+import type {
+  ExcludedSummary,
+  PairReconciliation,
+  Party,
+  ReconciliationSettings,
+  Statement,
+  StatementEntry,
+} from '../types';
 import { allocatePayments } from './allocate';
 import { buildActions } from './actions';
 import { matchStatements } from './matchEntries';
-import { buildBridge } from './reconcile';
+import { selectOpenItems } from './openItems';
+import { buildBridge, openingBalance } from './reconcile';
 
 export const DEFAULT_SETTINGS: ReconciliationSettings = {
   amountTolerance: 0.01,
   dayTolerance: 7,
   allowDateAmountFallback: true,
+  openItemsOnly: false,
   termDays: 30,
   asOfDate: '',
 };
 
+const NOTHING_EXCLUDED: ExcludedSummary = {
+  active: false,
+  creditorSettled: 0,
+  debtorSettled: 0,
+  openingLines: 0,
+};
+
+/** True when either export tells us which of its lines the ERP has closed. */
+export function hasClearingInformation(...ledgers: StatementEntry[][]): boolean {
+  return ledgers.some((entries) => entries.some((entry) => entry.clearingDoc !== ''));
+}
+
 /**
- * Runs one creditor/debtor pair end to end: match, bridge, allocate, advise.
+ * Runs one creditor/debtor pair end to end: match, narrow, bridge, allocate,
+ * advise.
+ *
+ * Matching always runs over every line, even the settled ones, because that
+ * is what lets one side's "this invoice is closed" be carried across to the
+ * other side's copy of it. Only afterwards is the comparison narrowed to what
+ * is still open — narrowing first would throw away the very links that make
+ * the narrowing correct.
  *
  * Ageing is measured on the creditor's ledger, because that is the side that
- * chases the money and the side whose invoice dates and vade the debtor has
- * to answer to.
+ * chases the money and whose vade the debtor has to answer to.
  */
 export function reconcilePair(
   creditor: Party,
@@ -26,11 +53,31 @@ export function reconcilePair(
   debtorStatement: Statement,
   settings: ReconciliationSettings,
 ): PairReconciliation {
-  const match = matchStatements(creditorStatement, debtorStatement, settings);
-  const bridge = buildBridge(creditorStatement, debtorStatement, match, settings.amountTolerance);
+  const fullMatch = matchStatements(creditorStatement, debtorStatement, settings);
+
+  const view = settings.openItemsOnly
+    ? selectOpenItems(creditorStatement, debtorStatement, fullMatch)
+    : {
+        creditorStatement,
+        debtorStatement,
+        match: fullMatch,
+        excluded: NOTHING_EXCLUDED,
+      };
+
+  const bridge = buildBridge(
+    view.creditorStatement,
+    view.debtorStatement,
+    view.match,
+    settings.amountTolerance,
+    {
+      creditor: openingBalance(creditorStatement),
+      debtor: openingBalance(debtorStatement),
+    },
+  );
+
   const allocation = allocatePayments(
-    creditorStatement.entries,
-    creditorStatement.perspective,
+    view.creditorStatement.entries,
+    view.creditorStatement.perspective,
     settings.termDays,
     settings.asOfDate,
   );
@@ -40,18 +87,26 @@ export function reconcilePair(
   const scale = Math.max(Math.abs(bridge.creditorBalance), Math.abs(bridge.debtorBalance), 1);
   const materiality = Math.max(100, scale * 0.005);
 
-  const actions = buildActions({ creditor, debtor, match, bridge, allocation, materiality });
+  const actions = buildActions({
+    creditor,
+    debtor,
+    match: view.match,
+    bridge,
+    allocation,
+    materiality,
+  });
 
   return {
     creditor,
     debtor,
-    creditorStatement,
-    debtorStatement,
+    creditorStatement: view.creditorStatement,
+    debtorStatement: view.debtorStatement,
     currency: creditorStatement.currency || debtorStatement.currency,
-    match,
+    match: view.match,
     bridge,
     allocation,
     actions,
     asOfDate: settings.asOfDate,
+    excluded: view.excluded,
   };
 }

@@ -141,6 +141,16 @@ export function ResultView({ locale, result, onRestart }: Props) {
 
       {!bridge.reconciles && <div className="notice error">{t('result.bridgeBroken')}</div>}
 
+      {result.excluded.active && (
+        <div className="notice info">
+          {t('result.excluded', {
+            creditorSettled: result.excluded.creditorSettled,
+            debtorSettled: result.excluded.debtorSettled,
+            openingLines: result.excluded.openingLines,
+          })}
+        </div>
+      )}
+
       <section className="card">
         <div className="card-head">
           <h2>SONUÇ TABLOSU</h2>

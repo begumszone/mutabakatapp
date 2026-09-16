@@ -49,6 +49,7 @@ const tr: Dict = {
   'mapping.field.credit': 'Alacak',
   'mapping.field.amount': 'Tutar (işaretli)',
   'mapping.field.currency': 'Para birimi',
+  'mapping.field.clearingDoc': 'Kapanış (clearing) belgesi',
   'mapping.none': '— yok —',
   'mapping.missingDate': 'Tarih kolonu seçilmeden mutabakat yapılamaz.',
   'mapping.missingAmount': 'Tutar kolonu seçilmedi.',
@@ -72,6 +73,13 @@ const tr: Dict = {
   'settings.amountTolerance': 'Tutar toleransı',
   'settings.dayTolerance': 'Gün toleransı',
   'settings.fallback': 'Belge no yoksa tarih + tutar ile eşleştir',
+  'settings.openItems': 'Sadece açık kalemler üzerinden mutabakat',
+  'settings.openItemsHint':
+    'Ekstre hangi satırlarının kapandığını söylüyorsa (clearing belgesi), kapanmış belgeler ve karşı taraftaki eşleri karşılaştırmadan çıkarılır. İki taraf da "hâlâ ne borçlu" tabanında karşılaştırılır. Ekstrenizde kapanış kolonu bulunduğu için otomatik açıldı.',
+  'settings.openItemsUnavailable':
+    'Yüklenen ekstrelerde kapanış (clearing) belgesi kolonu yok; tüm satırlar karşılaştırılacak.',
+  'result.excluded':
+    'Açık kalem modu: {creditorSettled} kapanmış alacaklı satırı, {debtorSettled} kapanmış borçlu satırı ve {openingLines} devir satırı karşılaştırma dışında tutuldu. Devir aşağıda ayrıca raporlanıyor.',
 
   'result.balanceToday': 'Bugünkü Bakiye',
   'result.opening': 'Devir',
@@ -203,6 +211,7 @@ const en: Dict = {
   'mapping.field.credit': 'Credit',
   'mapping.field.amount': 'Amount (signed)',
   'mapping.field.currency': 'Currency',
+  'mapping.field.clearingDoc': 'Clearing document',
   'mapping.none': '— none —',
   'mapping.missingDate': 'A date column is required.',
   'mapping.missingAmount': 'No amount column selected.',
@@ -226,6 +235,13 @@ const en: Dict = {
   'settings.amountTolerance': 'Amount tolerance',
   'settings.dayTolerance': 'Day tolerance',
   'settings.fallback': 'Match on date + amount when there is no document number',
+  'settings.openItems': 'Reconcile open items only',
+  'settings.openItemsHint':
+    'Where an export says which of its lines are closed, settled documents and their counterparts on the other side drop out, so both sides are compared on what is still owed. Switched on automatically because a clearing column was found.',
+  'settings.openItemsUnavailable':
+    'Neither upload carries a clearing-document column, so every line will be compared.',
+  'result.excluded':
+    'Open-item mode: {creditorSettled} settled creditor lines, {debtorSettled} settled debtor lines and {openingLines} opening lines were left out of the comparison. The opening is reported separately below.',
 
   'result.balanceToday': 'Closing balance',
   'result.opening': 'Opening (devir)',

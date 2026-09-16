@@ -28,6 +28,7 @@ function entry(
     debit,
     credit,
     currency: 'TRY',
+    clearingDoc: '',
     ...extra,
   };
 }
@@ -48,6 +49,7 @@ const settings: ReconciliationSettings = {
   amountTolerance: 0.01,
   dayTolerance: 7,
   allowDateAmountFallback: true,
+  openItemsOnly: false,
   termDays: 30,
   asOfDate: '2026-08-31',
 };

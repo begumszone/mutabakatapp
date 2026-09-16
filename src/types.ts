@@ -55,6 +55,13 @@ export interface StatementEntry {
   /** Alacak, always >= 0. */
   credit: number;
   currency: string;
+  /**
+   * The ERP's clearing/kapanış document, when the export carries one. A
+   * non-empty value means that ERP considers this line settled — the invoice
+   * and the payment that closed it have already been matched internally.
+   * Empty means the line is still open, or that the export says nothing.
+   */
+  clearingDoc: string;
 }
 
 /**
@@ -168,6 +175,17 @@ export interface BalanceBridge {
   agreed: boolean;
 }
 
+/** What the open-item reading left out of the comparison. */
+export interface ExcludedSummary {
+  active: boolean;
+  /** Creditor lines the ERP had already cleared. */
+  creditorSettled: number;
+  /** Debtor lines settled because they matched a cleared creditor line. */
+  debtorSettled: number;
+  /** Opening (devir) lines, reported on their own row rather than compared. */
+  openingLines: number;
+}
+
 export type AgingBucket = 'notDue' | 'd1to30' | 'd31to60' | 'd61to90' | 'd90plus';
 
 /** An invoice after payments have been allocated against it. */
@@ -224,6 +242,17 @@ export interface RecommendedAction {
 }
 
 export interface ReconciliationSettings extends MatchSettings {
+  /**
+   * Reconcile only what is still open.
+   *
+   * A SAP-style extract is an open-item list plus its settled history: the
+   * balance it reports is the rows with no clearing document, and the rest
+   * are invoices already closed by payments the extract may not even carry.
+   * With this on, settled documents drop out of the comparison on both sides
+   * — including the counterparty rows that matched them — so the two sides
+   * are compared on the same basis: what is genuinely still owed.
+   */
+  openItemsOnly: boolean;
   /** Payment terms in days when a line carries no vade of its own. */
   termDays: number;
   /** The date ageing is measured from. ISO. */
@@ -243,6 +272,8 @@ export interface PairReconciliation {
   actions: RecommendedAction[];
   /** The date ageing and the result table are stated as of. */
   asOfDate: string;
+  /** What was set aside as already settled, and why the totals look smaller. */
+  excluded: ExcludedSummary;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +326,8 @@ export interface ColumnMapping {
   /** The single signed column, when `amountLayout` is 'signed'. */
   amount: string | null;
   currency: string | null;
+  /** The ERP's clearing document column, when the export has one. */
+  clearingDoc: string | null;
 }
 
 export interface MappingIssue {

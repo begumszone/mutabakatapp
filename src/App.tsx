@@ -16,7 +16,7 @@ import { FileParseError, parseWorkbook, sheetToParsedFile } from './adapters/par
 import { suggestMapping, validateMapping } from './adapters/suggestMapping';
 import { buildStatement, makeStatement, type BuildResult } from './adapters/buildStatement';
 import { orientEntries } from './core/claim';
-import { reconcilePair } from './core/reconcilePair';
+import { hasClearingInformation, reconcilePair } from './core/reconcilePair';
 import { todayIso } from './core/parseDate';
 import { useTheme } from './hooks/useTheme';
 import { FileDrop } from './components/FileDrop';
@@ -80,7 +80,7 @@ function makeSource(
     mapping: {
       date: null, dueDate: null, docNo: null, docNoAlt: null, docTypeColumn: null,
       description: null, amountLayout: 'debitCredit', debit: null, credit: null,
-      amount: null, currency: null,
+      amount: null, currency: null, clearingDoc: null,
     },
     perspective: perspective ?? 'receivable',
   };
@@ -144,17 +144,29 @@ export function App() {
     amountTolerance: 0.01,
     dayTolerance: 7,
     allowDateAmountFallback: true,
+    openItemsOnly: false,
     termDays: 30,
     asOfDate: todayIso(),
   });
 
   const [result, setResult] = useState<PairReconciliation | null>(null);
+  /** Until the reader decides for themselves, the uploads decide for them. */
+  const [openItemsTouched, setOpenItemsTouched] = useState(false);
 
   const t = (key: string, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
 
   const creditorBuild = useMemo(() => buildSide(creditorSide), [creditorSide]);
   const debtorBuild = useMemo(() => buildSide(debtorSide), [debtorSide]);
+
+  // An export that names the document which closed each line is telling us it
+  // is an open-item list, so that reading is the default whenever one appears.
+  const clearingAvailable = useMemo(
+    () =>
+      hasClearingInformation(creditorBuild.entries, debtorBuild.entries),
+    [creditorBuild.entries, debtorBuild.entries],
+  );
+  const openItemsOnly = openItemsTouched ? settings.openItemsOnly : clearingAvailable;
 
   const addFile = async (file: File, which: 'creditor' | 'debtor', replace: boolean) => {
     setError(null);
@@ -303,7 +315,12 @@ export function App() {
       'receivable',
     );
 
-    setResult(reconcilePair(creditor, debtor, creditorStatement, debtorStatement, settings));
+    setResult(
+      reconcilePair(creditor, debtor, creditorStatement, debtorStatement, {
+        ...settings,
+        openItemsOnly,
+      }),
+    );
     setStep('result');
   };
 
@@ -311,6 +328,7 @@ export function App() {
     setCreditorSide(EMPTY_SIDE);
     setDebtorSide(EMPTY_SIDE);
     setResult(null);
+    setOpenItemsTouched(false);
     setStep('upload');
   };
 
@@ -475,6 +493,18 @@ export function App() {
                 <label className="row small" style={{ gap: 8 }}>
                   <input
                     type="checkbox"
+                    checked={openItemsOnly}
+                    disabled={!clearingAvailable}
+                    onChange={(event) => {
+                      setOpenItemsTouched(true);
+                      setSettings((s) => ({ ...s, openItemsOnly: event.target.checked }));
+                    }}
+                  />
+                  {t('settings.openItems')}
+                </label>
+                <label className="row small" style={{ gap: 8 }}>
+                  <input
+                    type="checkbox"
                     checked={settings.allowDateAmountFallback}
                     onChange={(event) =>
                       setSettings((s) => ({ ...s, allowDateAmountFallback: event.target.checked }))
@@ -482,6 +512,9 @@ export function App() {
                   />
                   {t('settings.fallback')}
                 </label>
+              </div>
+              <div className="card-body tight faint" style={{ paddingTop: 0 }}>
+                {clearingAvailable ? t('settings.openItemsHint') : t('settings.openItemsUnavailable')}
               </div>
             </section>
 
