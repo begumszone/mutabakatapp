@@ -29,7 +29,20 @@ export function looksHeaderless(file: ParsedFile): boolean {
 }
 
 function values(rows: RawRow[], header: string): (number | null)[] {
-  return rows.map((row) => parseAmount(row[header]));
+  return rows.map((row) => (isNumericCell(row[header]) ? parseAmount(row[header]) : null));
+}
+
+/**
+ * Whether a cell is written as a number.
+ *
+ * Deliberately stricter than the amount parser, which will pull a figure out
+ * of almost anything — "FT-1" comes back as -1 from it, which was enough to
+ * make an invoice-number column look like money.
+ */
+function isNumericCell(raw: unknown): boolean {
+  if (typeof raw === 'number') return Number.isFinite(raw);
+  const text = String(raw).trim();
+  return /\d/.test(text) && /^-?[\d.,\s]+-?$/.test(text);
 }
 
 function numericShare(rows: RawRow[], header: string): number {
@@ -39,7 +52,7 @@ function numericShare(rows: RawRow[], header: string): number {
     const raw = row[header];
     if (raw === null || raw === undefined || String(raw).trim() === '') continue;
     filled++;
-    if (parseAmount(raw) !== null) numeric++;
+    if (isNumericCell(raw) && parseAmount(raw) !== null) numeric++;
   }
   return filled === 0 ? 0 : numeric / filled;
 }
@@ -76,6 +89,31 @@ function dateShare(rows: RawRow[], header: string): number {
     if (looksLikeDateCell(raw)) dates++;
   }
   return filled === 0 ? 0 : dates / filled;
+}
+
+/**
+ * Whether a numeric column holds money rather than an identifier.
+ *
+ * Account codes, customer numbers and SAP document numbers are numeric too,
+ * and on a headerless sheet they sit right next to the amounts. Three things
+ * separate them: money carries kuruş, money goes negative, and money varies
+ * in magnitude — an identifier is the same width on every row, an amount runs
+ * from 55,91 to 324.130,91. Any one of the three is enough.
+ */
+function looksLikeMoney(rows: RawRow[], header: string): boolean {
+  const widths = new Set<number>();
+  let seen = 0;
+  for (const row of rows) {
+    const raw = row[header];
+    if (!isNumericCell(raw)) continue;
+    const value = parseAmount(raw);
+    if (value === null) continue;
+    seen++;
+    if (!Number.isInteger(value)) return true;
+    if (value < 0) return true;
+    widths.add(Math.abs(Math.trunc(value)).toString().length);
+  }
+  return seen > 0 && widths.size >= 2;
 }
 
 function near(a: number, b: number): boolean {
@@ -142,14 +180,7 @@ export function inferColumns(file: ParsedFile): InferredColumns {
   }
 
   const moneyCols = headers.filter(
-    (header) =>
-      numericShare(sample, header) >= 0.9 &&
-      // An id column is numeric too; money is what varies in magnitude and
-      // carries kuruş, an account code does neither.
-      sample.some((row) => {
-        const v = parseAmount(row[header]);
-        return v !== null && !Number.isInteger(v);
-      }),
+    (header) => numericShare(sample, header) >= 0.9 && looksLikeMoney(sample, header),
   );
 
   const dateCols = headers
@@ -184,12 +215,24 @@ export function inferColumns(file: ParsedFile): InferredColumns {
   mapping.date = dateCols[0] ?? null;
   mapping.dueDate = dateCols[1] ?? null;
 
-  // The document number: the most distinctive text column that carries digits.
-  let bestDoc: { header: string; score: number } | null = null;
+  /*
+   * The document number, and which of two candidates it should be.
+   *
+   * A SAP extract carries both its own document number (1400000243) and the
+   * reference the invoice was raised under (AB12026000007057). Only the
+   * second one exists in the counterparty's books; matching on the first
+   * matches nothing at all, which is how a file with identical amounts on
+   * both sides comes back with a thousand unmatched lines. A reference that
+   * mixes letters and digits is therefore worth far more than a longer,
+   * tidier internal id, and the internal one is kept as the alternate.
+   */
+  const docCandidates: { header: string; score: number }[] = [];
   for (const header of headers) {
     if (dateCols.includes(header) || moneyCols.includes(header)) continue;
     const seen = new Set<string>();
     let withDigits = 0;
+    let alphanumeric = 0;
+    let spaced = 0;
     let filled = 0;
     for (const row of sample) {
       const raw = row[header];
@@ -198,12 +241,22 @@ export function inferColumns(file: ParsedFile): InferredColumns {
       filled++;
       seen.add(text);
       if (/\d/.test(text) && text.length >= 4) withDigits++;
+      if (/\d/.test(text) && /[A-Za-zÇĞİÖŞÜçğıöşü]/.test(text) && text.length >= 6) alphanumeric++;
+      // A document number is one token. Anything with spaces in it is prose --
+      // a description, a bank narrative -- however many digits it carries.
+      if (/\s/.test(text)) spaced++;
     }
     if (filled === 0) continue;
-    const score = (seen.size / filled) * (withDigits / filled);
-    if (score > 0.5 && (bestDoc === null || score > bestDoc.score)) bestDoc = { header, score };
+    const distinctness = seen.size / filled;
+    const digitShare = withDigits / filled;
+    const referenceShare = alphanumeric / filled;
+    const proseShare = spaced / filled;
+    const score = distinctness * digitShare * (1 + referenceShare) * (1 - proseShare);
+    if (score > 0.4) docCandidates.push({ header, score });
   }
-  mapping.docNo = bestDoc?.header ?? null;
+  docCandidates.sort((a, b) => b.score - a.score);
+  mapping.docNo = docCandidates[0]?.header ?? null;
+  mapping.docNoAlt = docCandidates[1]?.header ?? null;
 
   const ambiguousMoneyColumns: string[] = [];
   const signed = movementCols.filter((header) => {
