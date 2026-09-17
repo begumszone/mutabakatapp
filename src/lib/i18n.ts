@@ -10,7 +10,7 @@ type Dict = Record<string, string>;
  * vocabulary to check the app against the spreadsheet it replaces.
  */
 const tr: Dict = {
-  'app.title': 'Mutabakat',
+  'app.title': 'MutabakatAPP',
   'app.subtitle': 'İki firmanın cari hesap ekstrelerini karşılaştırır, farkları ve alınacak aksiyonları çıkarır.',
   'app.privacy': 'Dosyalarınız tarayıcınızdan çıkmaz. Hiçbir veri sunucuya yüklenmez.',
 
@@ -220,7 +220,7 @@ const tr: Dict = {
 };
 
 const en: Dict = {
-  'app.title': 'Reconciliation',
+  'app.title': 'MutabakatAPP',
   'app.subtitle':
     'Compares two companies’ current-account statements, then reports the differences and what to do about them.',
   'app.privacy': 'Your files never leave your browser. Nothing is uploaded to a server.',

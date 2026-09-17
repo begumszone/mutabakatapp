@@ -1,4 +1,4 @@
-# Mutabakat
+# MutabakatAPP
 
 İki firmanın cari hesap ekstrelerini karşılaştırıp mutabakatını çıkaran,
 tamamen tarayıcıda çalışan bir uygulama. Dosyalar hiçbir sunucuya

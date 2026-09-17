@@ -54,7 +54,7 @@ export async function buildSampleWorkbook(side: SampleSide): Promise<Blob> {
   const source = side === 'creditor' ? sampleFiles().creditor : sampleFiles().debtor;
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Mutabakat';
+  workbook.creator = 'MutabakatAPP';
   const sheet = workbook.addWorksheet(meta.sheetName);
   sheet.columns = [
     { width: 13 }, { width: 13 }, { width: 22 }, { width: 34 }, { width: 16 }, { width: 16 },

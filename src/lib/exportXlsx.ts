@@ -42,7 +42,7 @@ export async function exportReconciliation(
   const { creditor, debtor, bridge, match, allocation, actions } = result;
 
   const workbook = new ExcelJS.Workbook();
-  workbook.creator = 'Mutabakat';
+  workbook.creator = 'MutabakatAPP';
   workbook.created = new Date();
 
   // --- SONUÇ TABLOSU ------------------------------------------------------

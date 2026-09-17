@@ -426,8 +426,10 @@ export function App() {
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <span className="mark">{t('app.title')}</span>
-          <span className="tag">cari hesap</span>
+          <span className="mark">
+            Mutabakat<span className="mark-suffix">APP</span>
+          </span>
+          <span className="tag">cari hesap mutabakatı</span>
         </div>
         <nav className="steps" aria-label={t('app.title')}>
           {[t('step.upload'), t('step.map'), t('step.result')].map((label, index) => (
