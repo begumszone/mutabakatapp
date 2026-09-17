@@ -2,6 +2,7 @@ import Papa from 'papaparse';
 import ExcelJS from 'exceljs';
 import type { ParsedFile, ParsedSheet, ParsedWorkbook, RawRow } from '../types';
 import { detectHeaderRowIndex, type Cell } from './detectHeaderRow';
+import { stripPresentationParts } from './repairWorkbook';
 
 export class FileParseError extends Error {}
 
@@ -132,7 +133,21 @@ export async function parseXlsxBuffer(
   buffer: ArrayBuffer,
 ): Promise<ParsedWorkbook> {
   const workbook = new ExcelJS.Workbook();
-  await workbook.xlsx.load(buffer);
+  try {
+    await workbook.xlsx.load(buffer);
+  } catch (error) {
+    // Some genuinely valid exports carry parts the reader cannot handle --
+    // an Excel Table with a colour filter, for one. Strip the presentation
+    // wrapper and read the cells rather than telling the user their file is
+    // broken, which it is not.
+    try {
+      await workbook.xlsx.load(await stripPresentationParts(buffer));
+    } catch {
+      throw new FileParseError(
+        `"${fileName}" okunamadı: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+  }
   if (workbook.worksheets.length === 0) {
     throw new FileParseError(`"${fileName}" hiç sayfa içermiyor.`);
   }

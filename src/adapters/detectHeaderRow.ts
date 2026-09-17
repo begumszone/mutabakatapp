@@ -1,5 +1,14 @@
 export type Cell = string | number | null;
 
+/**
+ * What `detectHeaderRowIndex` returns for a sheet that has no header row.
+ *
+ * Reading such a sheet must not consume its first line: every row is data.
+ * Callers slice from `index + 1`, so -1 keeps the whole grid and the columns
+ * fall back to generic names the user can label by hand.
+ */
+export const NO_HEADER_ROW = -1;
+
 function isBlank(cell: Cell): boolean {
   return cell === null || cell === undefined || String(cell).trim() === '';
 }
@@ -26,6 +35,24 @@ function distinctCount(row: Cell[]): number {
   return seen.size;
 }
 
+/**
+ * True when a cell reads as a calendar date.
+ *
+ * A header never holds one. Some ERP exports (SAP among them) ship the raw
+ * table with no header row at all, and the scorer below would otherwise
+ * crown the first transaction — turning an invoice number into a column
+ * name and losing that line from the ledger entirely.
+ */
+function looksLikeDate(cell: Cell): boolean {
+  if (cell === null || cell === undefined) return false;
+  const text = String(cell).trim();
+  if (text === '') return false;
+  return (
+    /^\d{4}-\d{2}-\d{2}/.test(text) ||
+    /^\d{1,2}[./-]\d{1,2}[./-]\d{2,4}$/.test(text)
+  );
+}
+
 function numericCount(row: Cell[]): number {
   return row.filter((c) => typeof c === 'number' || (typeof c === 'string' && /^-?[\d.,\s]+$/.test(c.trim()) && /\d/.test(c))).length;
 }
@@ -44,7 +71,7 @@ function numericCount(row: Cell[]): number {
  */
 export function detectHeaderRowIndex(grid: Cell[][]): number {
   const limit = Math.min(grid.length, 25); // headers never live 25 rows down
-  let bestIndex = 0;
+  let bestIndex = NO_HEADER_ROW;
   let bestScore = -Infinity;
 
   const widest = Math.max(1, ...grid.slice(0, limit).map(filled));
@@ -61,6 +88,11 @@ export function detectHeaderRowIndex(grid: Cell[][]): number {
     // repeated. Two distinct values across a wide row is a banner, not a
     // header.
     if (cells >= 3 && distinct <= Math.max(2, cells * 0.4)) continue;
+
+    // Hard disqualifications. These are not "score a bit lower" signals:
+    // a row holding a date, or made mostly of numbers, is a transaction.
+    if (row.some(looksLikeDate)) continue;
+    if (textCells < 2 || textCells / cells < 0.6) continue;
 
     const next = grid[i + 1];
     if (!next || filled(next) === 0) continue; // a header must be followed by data
