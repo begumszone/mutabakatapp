@@ -15,7 +15,6 @@ function entry(
     id,
     sourceRow: 1,
     date,
-    dueDate: null,
     docNo,
     docKey: normalizeDocNo(docNo),
     docKeyLoose: normalizeDocNoLoose(docNo),
@@ -51,7 +50,6 @@ const settings: ReconciliationSettings = {
   amountTolerance: 0.01,
   dayTolerance: 7,
   allowDateAmountFallback: true,
-  openItemsOnly: false,
   requestedPeriod: null,
   asOfDate: '2026-06-30',
 };

@@ -1,51 +1,31 @@
 import type {
-  ExcludedSummary,
   PairReconciliation,
   Party,
   ReconciliationSettings,
   Statement,
-  StatementEntry,
 } from '../types';
-import { allocatePayments } from './allocate';
 import { buildActions } from './actions';
 import { matchStatements } from './matchEntries';
 import { alignPeriods } from './period';
-import { selectOpenItems } from './openItems';
 import { buildBridge } from './reconcile';
 
 export const DEFAULT_SETTINGS: ReconciliationSettings = {
   amountTolerance: 0.01,
   dayTolerance: 7,
   allowDateAmountFallback: true,
-  openItemsOnly: false,
   requestedPeriod: null,
   asOfDate: '',
 };
 
-const NOTHING_EXCLUDED: ExcludedSummary = {
-  active: false,
-  creditorSettled: 0,
-  debtorSettled: 0,
-  openingLines: 0,
-};
-
-/** True when either export tells us which of its lines the ERP has closed. */
-export function hasClearingInformation(...ledgers: StatementEntry[][]): boolean {
-  return ledgers.some((entries) => entries.some((entry) => entry.clearingDoc !== ''));
-}
 
 /**
- * Runs one creditor/debtor pair end to end: match, narrow, bridge, allocate,
+ * Runs one creditor/debtor pair end to end: align in time, match, bridge,
  * advise.
  *
- * Matching always runs over every line, even the settled ones, because that
- * is what lets one side's "this invoice is closed" be carried across to the
- * other side's copy of it. Only afterwards is the comparison narrowed to what
- * is still open — narrowing first would throw away the very links that make
- * the narrowing correct.
- *
- * Ageing is measured on the creditor's ledger, because that is the side that
- * chases the money and whose vade the debtor has to answer to.
+ * The order matters. Two ledgers can only be compared where they overlap, and
+ * what each side carried *into* that overlap has to be settled before any
+ * document inside it means anything — a devir the two sides do not share is a
+ * difference no amount of document matching will ever explain.
  */
 export function reconcilePair(
   creditor: Party,
@@ -54,46 +34,28 @@ export function reconcilePair(
   debtorStatement: Statement,
   settings: ReconciliationSettings,
 ): PairReconciliation {
-  // Time first. Two statements can only be compared where they overlap, and
-  // what each side carried into that overlap has to be settled before any
-  // document inside it means anything.
   const { alignment, creditor: creditorSplit, debtor: debtorSplit } = alignPeriods(
     creditorStatement,
     debtorStatement,
     settings.amountTolerance,
-    !settings.openItemsOnly,
+    true,
     settings.requestedPeriod,
   );
   const creditorInPeriod: Statement = { ...creditorStatement, entries: creditorSplit.inside };
   const debtorInPeriod: Statement = { ...debtorStatement, entries: debtorSplit.inside };
 
-  const fullMatch = matchStatements(creditorInPeriod, debtorInPeriod, settings);
-
-  const view = settings.openItemsOnly
-    ? selectOpenItems(creditorInPeriod, debtorInPeriod, fullMatch)
-    : {
-        creditorStatement: creditorInPeriod,
-        debtorStatement: debtorInPeriod,
-        match: fullMatch,
-        excluded: NOTHING_EXCLUDED,
-      };
+  const match = matchStatements(creditorInPeriod, debtorInPeriod, settings);
 
   const bridge = buildBridge(
-    view.creditorStatement,
-    view.debtorStatement,
-    view.match,
+    creditorInPeriod,
+    debtorInPeriod,
+    match,
     settings.amountTolerance,
     {
       creditor: creditorSplit.opening,
       debtor: debtorSplit.opening,
-      includeInBalance: !settings.openItemsOnly,
+      includeInBalance: true,
     },
-  );
-
-  const allocation = allocatePayments(
-    view.creditorStatement.entries,
-    view.creditorStatement.perspective,
-    settings.asOfDate,
   );
 
   // "Material" scales with the relationship: a 500 TL gap is noise against a
@@ -104,9 +66,10 @@ export function reconcilePair(
   const actions = buildActions({
     creditor,
     debtor,
-    match: view.match,
+    match,
+    creditorStatement: creditorInPeriod,
+    debtorStatement: debtorInPeriod,
     bridge,
-    allocation,
     materiality,
     period: alignment,
   });
@@ -114,15 +77,13 @@ export function reconcilePair(
   return {
     creditor,
     debtor,
-    creditorStatement: view.creditorStatement,
-    debtorStatement: view.debtorStatement,
+    creditorStatement: creditorInPeriod,
+    debtorStatement: debtorInPeriod,
     currency: creditorStatement.currency || debtorStatement.currency,
-    match: view.match,
+    match,
     bridge,
-    allocation,
     actions,
     asOfDate: settings.asOfDate,
-    excluded: view.excluded,
     period: alignment,
   };
 }

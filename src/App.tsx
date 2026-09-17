@@ -12,6 +12,7 @@ import type {
   StatementEntry,
 } from './types';
 import { translate } from './lib/i18n';
+import { formatDate } from './lib/formatters';
 import { sampleFiles, samplePeriodMismatch } from './lib/sampleData';
 import { FileParseError, parseWorkbook, sheetToParsedFile } from './adapters/parseFile';
 import { suggestMapping, validateMapping } from './adapters/suggestMapping';
@@ -19,7 +20,7 @@ import { inferColumns, looksHeaderless, type InferredColumns } from './adapters/
 import { buildStatement, makeStatement, type BuildResult } from './adapters/buildStatement';
 import { EMPTY_PREAMBLE, readPreamble, type Preamble } from './adapters/readPreamble';
 import { orientEntries } from './core/claim';
-import { hasClearingInformation, reconcilePair } from './core/reconcilePair';
+import { reconcilePair } from './core/reconcilePair';
 import { todayIso } from './core/parseDate';
 import { useTheme } from './hooks/useTheme';
 import { FileDrop } from './components/FileDrop';
@@ -96,7 +97,7 @@ function makeSource(
     sheetIndex,
     headerRow,
     mapping: {
-      date: null, dueDate: null, docNo: null, docNoAlt: null, docTypeColumn: null,
+      date: null, docNo: null, docNoAlt: null, docTypeColumn: null,
       description: null, amountLayout: 'debitCredit', debit: null, credit: null,
       amount: null, currency: null, clearingDoc: null,
     },
@@ -220,20 +221,36 @@ const PERIOD_PRESETS = [
 
 type PresetKey = (typeof PERIOD_PRESETS)[number]['key'] | 'custom';
 
-function presetRange(key: PresetKey, today: string): { start: string; end: string } | null {
-  const year = Number(today.slice(0, 4));
+/**
+ * Where the window starts, counting back from the mutabakat tarihi.
+ *
+ * Cari hesap mutabakatı is normally run from the start of the year the
+ * balance date falls in. The multi-year options exist because when nobody has
+ * reconciled for a while the devir itself is in doubt, and the only way to
+ * settle it is to go back far enough to see it formed.
+ */
+function presetRange(key: PresetKey, asOf: string): { start: string; end: string } | null {
+  const year = Number(asOf.slice(0, 4));
   switch (key) {
     case 'ytd':
-      return { start: `${year}-01-01`, end: today };
+      return { start: `${year}-01-01`, end: asOf };
     case 'lastYear':
-      return { start: `${year - 1}-01-01`, end: `${year - 1}-12-31` };
+      return { start: `${year - 1}-01-01`, end: asOf };
     case 'twoYears':
-      return { start: `${year - 1}-01-01`, end: today };
+      return { start: `${year - 1}-01-01`, end: asOf };
     case 'threeYears':
-      return { start: `${year - 2}-01-01`, end: today };
+      return { start: `${year - 2}-01-01`, end: asOf };
     default:
       return null;
   }
+}
+
+/** The day a devir is struck: the one before the window opens. */
+function dayBefore(iso: string): string {
+  if (!iso) return '';
+  const day = new Date(`${iso}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - 1);
+  return day.toISOString().slice(0, 10);
 }
 
 /** The earlier of two ISO dates; a blank one is not a boundary at all. */
@@ -259,7 +276,6 @@ export function App() {
     amountTolerance: 0.01,
     dayTolerance: 7,
     allowDateAmountFallback: true,
-    openItemsOnly: false,
     requestedPeriod: null,
     asOfDate: todayIso(),
   });
@@ -272,21 +288,27 @@ export function App() {
   /** Typing a date by hand means the reader has left the presets behind. */
   const setPeriod = (which: 'start' | 'end', value: string) => {
     setActivePreset('custom');
-    setPeriodState((current) => {
-      const next = { ...current, [which]: value };
-      // The balance is agreed at the end of the window unless the reader says
-      // otherwise, which is what they mean nine times out of ten.
-      if (which === 'end' && value) setSettings((s) => ({ ...s, asOfDate: value }));
-      return next;
-    });
+    setPeriodState((current) => ({ ...current, [which]: value }));
+  };
+
+  /**
+   * The mutabakat tarihi is the end of the window, not a separate date.
+   *
+   * "30.06.2026 mutabakatı" means the movements up to and including that day.
+   * Letting the two drift apart produced a table headed 30.06.2026 whose
+   * balances included July.
+   */
+  const setAsOf = (value: string) => {
+    setSettings((s) => ({ ...s, asOfDate: value }));
+    setPeriodState((current) => ({ ...current, end: value }));
+    setActivePreset('custom');
   };
 
   const applyPreset = (key: PresetKey) => {
-    const range = presetRange(key, todayIso());
+    const range = presetRange(key, settings.asOfDate || todayIso());
     if (!range) return;
     setActivePreset(key);
     setPeriodState(range);
-    setSettings((s) => ({ ...s, asOfDate: range.end }));
   };
 
   const [setupTab, setSetupTab] = useState<SetupTab>('sides');
@@ -305,17 +327,6 @@ export function App() {
   const debtorName =
     debtorSide.partyName || suggestPartyName(debtorSide, creditorSide) || t('common.debtor');
 
-  // An export that names the document which closed each line is telling us it
-  // is an open-item list, so that reading is the default whenever one appears.
-  const clearingAvailable = useMemo(
-    () =>
-      hasClearingInformation(creditorBuild.entries, debtorBuild.entries),
-    [creditorBuild.entries, debtorBuild.entries],
-  );
-  // Not a setting any more. An export that names the document which closed
-  // each line is telling us it is an open-item list; asking the reader to know
-  // that about their own ERP was asking the wrong person.
-  const openItemsOnly = clearingAvailable;
 
   const addFile = async (file: File, which: 'creditor' | 'debtor', replace: boolean) => {
     setError(null);
@@ -326,7 +337,14 @@ export function App() {
       if (!source) throw new FileParseError(file.name);
       const setSide = which === 'creditor' ? setCreditorSide : setDebtorSide;
       setSide((side) => ({
-        partyName: replace || !side.partyName ? file.name.replace(/\.[^.]+$/, '') : side.partyName,
+        // The file name is the last resort. When one workbook holds both
+        // sides — which is how every fark tablosu is built — naming both
+        // parties after the file leaves a result table with the same name in
+        // both columns, and nobody can tell which figure is whose.
+        partyName:
+          replace || !side.partyName
+            ? file.name.replace(/\.[^.]+$/, '')
+            : side.partyName,
         sources: replace ? [source] : [...side.sources, source],
       }));
     } catch (caught) {
@@ -397,14 +415,28 @@ export function App() {
       totalEntries: build.entries.length,
       // Choosing a sheet is also the answer to "which sheet?", so the
       // question stops being asked the moment it is answered.
-      onSheetIndex: (id: string, index: number) =>
+      onSheetIndex: (id: string, index: number) => {
         updateSource(which, id, (source) =>
           reguess(source, {
             sheetIndex: index,
             headerRow: source.workbook?.sheets[index]?.suggestedHeaderRow ?? 0,
             sheetConfirmed: true,
           }),
-        ),
+        );
+        // Choosing "PAROS" out of a workbook says who this side is far better
+        // than the file name does, so take it unless a name has been typed.
+        setSide((current) => {
+          const source = current.sources.find((item) => item.id === id);
+          const sheetName = source?.workbook?.sheets[index]?.name?.trim();
+          if (!sheetName || /^(sayfa|sheet|tablo)\s*\d*$/i.test(sheetName)) return current;
+          const untouched =
+            current.partyName === '' ||
+            current.sources.some(
+              (item) => item.workbook?.fileName.replace(/\.[^.]+$/, '') === current.partyName,
+            );
+          return untouched ? { ...current, partyName: sheetName } : current;
+        });
+      },
       onHeaderRow: (id: string, index: number) =>
         updateSource(which, id, (source) => reguess(source, { headerRow: index })),
       onMapping: (id: string, mapping: ColumnMapping) =>
@@ -495,7 +527,6 @@ export function App() {
     setResult(
       reconcilePair(creditor, debtor, creditorStatement, debtorStatement, {
         ...settings,
-        openItemsOnly,
         requestedPeriod:
           period.start && period.end
             ? // The balance is agreed as of `asOfDate`, so the window can never
@@ -719,7 +750,24 @@ export function App() {
 
               <div className="card-body stack">
                 <div>
-                  <div className="ask">{t('settings.askPeriod')}</div>
+                  <div className="ask">{t('settings.askAsOf')}</div>
+                  <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
+                    <label className="field">
+                      {t('settings.asOf')}
+                      <input
+                        type="date"
+                        value={settings.asOfDate}
+                        onChange={(event) => setAsOf(event.target.value)}
+                      />
+                    </label>
+                  </div>
+                  <p className="faint small" style={{ margin: '6px 0 0' }}>
+                    {t('settings.asOfHint')}
+                  </p>
+                </div>
+
+                <div>
+                  <div className="ask">{t('settings.askStart')}</div>
                   <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
                     <label className="field">
                       {t('settings.periodStart')}
@@ -727,14 +775,6 @@ export function App() {
                         type="date"
                         value={period.start}
                         onChange={(event) => setPeriod('start', event.target.value)}
-                      />
-                    </label>
-                    <label className="field">
-                      {t('settings.periodEnd')}
-                      <input
-                        type="date"
-                        value={period.end}
-                        onChange={(event) => setPeriod('end', event.target.value)}
                       />
                     </label>
                     <div className="seg presets">
@@ -751,26 +791,9 @@ export function App() {
                     </div>
                   </div>
                   <p className="faint small" style={{ margin: '6px 0 0' }}>
-                    {t('settings.periodHint')}
-                  </p>
-                </div>
-
-                <div>
-                  <div className="ask">{t('settings.askAsOf')}</div>
-                  <div className="row" style={{ gap: 14, alignItems: 'flex-end', flexWrap: 'wrap' }}>
-                    <label className="field">
-                      {t('settings.asOf')}
-                      <input
-                        type="date"
-                        value={settings.asOfDate}
-                        onChange={(event) =>
-                          setSettings((s) => ({ ...s, asOfDate: event.target.value }))
-                        }
-                      />
-                    </label>
-                  </div>
-                  <p className="faint small" style={{ margin: '6px 0 0' }}>
-                    {t('settings.asOfHint')}
+                    {t('settings.startHint', {
+                      opening: formatDate(dayBefore(period.start), locale),
+                    })}
                   </p>
                 </div>
 
@@ -820,11 +843,6 @@ export function App() {
                 </details>
               </div>
 
-              {clearingAvailable && (
-                <div className="card-body tight faint" style={{ paddingTop: 0 }}>
-                  {t('settings.openItemsAuto')}
-                </div>
-              )}
             </section>
             )}
 

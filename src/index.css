@@ -553,3 +553,42 @@ details.advanced > summary {
   font-size: 11px;
   font-weight: 700;
 }
+
+/* --- How the difference was arrived at ----------------------------------- */
+
+/*
+ * The arithmetic, shown rather than asserted. A reconciliation that only
+ * prints a verdict asks to be trusted; one that shows its working can be
+ * checked, which is the whole point of a mutabakat.
+ */
+.derivation .card-body > p {
+  margin: 0 0 12px;
+  max-width: 76ch;
+}
+
+.derive-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.derive-table td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+
+.derive-table tr:last-child td {
+  border-bottom: none;
+}
+
+.derive-table td.step {
+  width: 26px;
+  color: var(--text-faint);
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.derive-table tr.emphasis td {
+  font-weight: 650;
+  border-top: 1px solid var(--border-strong);
+}

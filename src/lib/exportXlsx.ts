@@ -39,7 +39,7 @@ export async function exportReconciliation(
   locale: Locale,
 ): Promise<Blob> {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars);
-  const { creditor, debtor, bridge, match, allocation, actions } = result;
+  const { creditor, debtor, bridge, match, actions } = result;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'MutabakatAPP';
@@ -220,39 +220,6 @@ export async function exportReconciliation(
       pair.debtorClaim,
       pair.amountDifference,
       t(`basis.${pair.basis}`),
-    ]);
-    for (const col of ['D', 'E', 'F']) row.getCell(col).numFmt = MONEY;
-  }
-
-  // --- Ageing -------------------------------------------------------------
-  const aging = workbook.addWorksheet('Yaşlandırma');
-  aging.columns = [
-    { width: 22 }, { width: 14 }, { width: 14 }, { width: 16 }, { width: 16 },
-    { width: 16 }, { width: 14 }, { width: 18 },
-  ];
-  headerRow(
-    aging.addRow([
-      t('table.docNo'),
-      t('table.date'),
-      t('table.dueDate'),
-      t('table.amount'),
-      'Kapanan',
-      t('table.open'),
-      t('table.daysOverdue'),
-      t('table.bucket'),
-    ]),
-  );
-  for (const invoice of allocation.invoices) {
-    if (invoice.open <= 0.01) continue;
-    const row = aging.addRow([
-      invoice.entry.docNo,
-      formatDate(invoice.entry.date, locale),
-      invoice.dueDate === null ? '—' : formatDate(invoice.dueDate, locale),
-      invoice.amount,
-      invoice.paid,
-      invoice.open,
-      invoice.daysOverdue,
-      t(`aging.${invoice.bucket}`),
     ]);
     for (const col of ['D', 'E', 'F']) row.getCell(col).numFmt = MONEY;
   }

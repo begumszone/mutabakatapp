@@ -40,8 +40,6 @@ export interface StatementEntry {
   sourceRow: number;
   /** ISO date, YYYY-MM-DD. */
   date: string;
-  /** Vade tarihi when the statement carries one, else null. */
-  dueDate: string | null;
   /** Document number exactly as it appeared in the file. */
   docNo: string;
   /** Normalized document number used for matching. May be ''. */
@@ -187,17 +185,6 @@ export interface BalanceBridge {
   agreed: boolean;
 }
 
-/** What the open-item reading left out of the comparison. */
-export interface ExcludedSummary {
-  active: boolean;
-  /** Creditor lines the ERP had already cleared. */
-  creditorSettled: number;
-  /** Debtor lines settled because they matched a cleared creditor line. */
-  debtorSettled: number;
-  /** Opening (devir) lines, reported on their own row rather than compared. */
-  openingLines: number;
-}
-
 /**
  * How the two statements line up in time, and what that costs.
  *
@@ -230,37 +217,6 @@ export interface PeriodAlignment {
   assumedZeroOpening: ('creditor' | 'debtor')[];
 }
 
-export type AgingBucket = 'notDue' | 'd1to30' | 'd31to60' | 'd61to90' | 'd90plus';
-
-/** An invoice after payments have been allocated against it. */
-export interface OpenInvoice {
-  entry: StatementEntry;
-  /** Invoice amount, oriented "debtor owes creditor". Always > 0. */
-  amount: number;
-  paid: number;
-  open: number;
-  /** Vade from the statement, or invoice date + agreed term. */
-  dueDate: string | null;
-  /**
-   * Where `dueDate` came from. `none` means the statement carried no vade —
-   * an invoice with no agreed due date is not overdue, and inventing one from
-   * a default term produces confident-looking figures nobody agreed to.
-   */
-  dueDateSource: 'statement' | 'none';
-  daysOverdue: number;
-  bucket: AgingBucket;
-  /** Ids of the payment entries that were applied to this invoice. */
-  appliedPaymentIds: string[];
-}
-
-export interface AllocationResult {
-  invoices: OpenInvoice[];
-  /** Payment money left over after every invoice was covered. */
-  unappliedPayments: number;
-  /** Payments that could not be tied to any invoice at all. */
-  unappliedPaymentIds: string[];
-}
-
 export type ActionSeverity = 'critical' | 'warning' | 'info';
 
 export type ActionCategory =
@@ -268,13 +224,11 @@ export type ActionCategory =
   | 'missingInOwn'
   | 'amountMismatch'
   | 'cutOff'
-  | 'overdue'
-  | 'dueSoon'
-  | 'unappliedPayment'
   | 'periodGap'
   | 'missingOpening'
   | 'openingMismatch'
   | 'openingVerified'
+  | 'incompleteExtract'
   | 'balanceAgreed';
 
 /** A concrete next step, addressed to a named party. */
@@ -294,17 +248,6 @@ export interface RecommendedAction {
 }
 
 export interface ReconciliationSettings extends MatchSettings {
-  /**
-   * Reconcile only what is still open.
-   *
-   * A SAP-style extract is an open-item list plus its settled history: the
-   * balance it reports is the rows with no clearing document, and the rest
-   * are invoices already closed by payments the extract may not even carry.
-   * With this on, settled documents drop out of the comparison on both sides
-   * — including the counterparty rows that matched them — so the two sides
-   * are compared on the same basis: what is genuinely still owed.
-   */
-  openItemsOnly: boolean;
   /**
    * The window the two ledgers are compared in, when the user names one.
    *
@@ -334,12 +277,9 @@ export interface PairReconciliation {
   currency: string;
   match: MatchResult;
   bridge: BalanceBridge;
-  allocation: AllocationResult;
   actions: RecommendedAction[];
   /** The date ageing and the result table are stated as of. */
   asOfDate: string;
-  /** What was set aside as already settled, and why the totals look smaller. */
-  excluded: ExcludedSummary;
   /** How the two statements line up in time. */
   period: PeriodAlignment;
 }
@@ -382,7 +322,6 @@ export type AmountLayout = 'debitCredit' | 'signed';
 /** Which uploaded column feeds each field the engine needs. */
 export interface ColumnMapping {
   date: string | null;
-  dueDate: string | null;
   docNo: string | null;
   /** A second reference column, used when the primary one is blank. */
   docNoAlt: string | null;
@@ -394,7 +333,13 @@ export interface ColumnMapping {
   /** The single signed column, when `amountLayout` is 'signed'. */
   amount: string | null;
   currency: string | null;
-  /** The ERP's clearing document column, when the export has one. */
+  /**
+   * The ERP's clearing document column, when the export has one.
+   *
+   * Carried through so a reader can see which lines their ERP considers
+   * closed. It no longer narrows the comparison: a mutabakat is agreed on the
+   * balance at a date, and a balance includes settled documents.
+   */
   clearingDoc: string | null;
 }
 

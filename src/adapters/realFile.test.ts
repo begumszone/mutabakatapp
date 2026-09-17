@@ -56,7 +56,6 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
     expect(mapping.debit).toBe('Borç Tut.');
     expect(mapping.credit).toBe('Alac.Tut.');
     expect(mapping.date).toBe('Tarih');
-    expect(mapping.dueDate).toBe('Vade Tarihi');
     expect(mapping.docNo).toBe('Fiş No');
 
     const build = buildStatement(parsed, mapping);
@@ -149,7 +148,6 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
       amountTolerance: 0.01,
       dayTolerance: 7,
       allowDateAmountFallback: true,
-      openItemsOnly: true,
       requestedPeriod: null,
       asOfDate: '2026-08-31',
     };
@@ -165,40 +163,36 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
       settings,
     );
 
-    // The supplier's own reported balance, reproduced from its open items.
-    expect(result.bridge.creditorBalance).toBe(501717.37);
-    // And the customer's copy of those same eight documents.
-    expect(result.bridge.debtorBalance).toBe(501717.36);
-    expect(result.bridge.difference).toBe(0.01);
+    // What the two ledgers say when each is summed to the same date.
+    //
+    // These are not the figures the two firms signed. AİR's export is a SAP
+    // open-item list: it carries payments settling invoices raised before it
+    // begins, so its rows add up to 30.467,42 while the balance both firms
+    // agreed is 501.717,37 — the sum of the rows SAP has not cleared. Summing
+    // such an extract is arithmetic on an incomplete ledger, so the engine
+    // says so rather than presenting the total as a balance.
+    expect(result.bridge.creditorBalance).toBe(30467.42);
+    expect(result.bridge.debtorBalance).toBe(486418.22);
 
-    // The whole gap is one invoice booked a kuruş apart — which is exactly
-    // the unexplained "-0,01" carried in the firms' hand-made SONUÇ TABLOSU.
+    // The eight documents both sides carry still line up, and the one
+    // genuine disagreement is still found: a kuruş on one invoice, which is
+    // the unexplained "-0,01" in the firms' own hand-made SONUÇ TABLOSU.
     const mismatches = result.match.pairs.filter((pair) => Math.abs(pair.amountDifference) >= 0.005);
     expect(mismatches).toHaveLength(1);
     expect(mismatches[0].creditorEntry.docNo).toBe('AL42026000005577');
     expect(mismatches[0].amountDifference).toBe(0.01);
 
-    // Nothing else is left over on either side, and the bridge proves it.
-    expect(result.match.creditorOnly).toHaveLength(0);
-    expect(result.match.debtorOnly).toHaveLength(0);
-    expect(result.bridge.reconciles).toBe(true);
-    expect(result.bridge.agreed).toBe(true);
-
-    // The devir still gets reported, even though it was set aside: it is the
-    // settled history in one figure, and comparing it as a document would
-    // double-count what the open-item reading just removed.
+    // The customer's devir is reported on its own row: it is the settled
+    // history in one figure, and a gap against the other side's opening is
+    // what sends somebody to ask for the earlier statement.
     expect(result.bridge.debtorOpening).toBe(443353.36);
-    expect(result.excluded.active).toBe(true);
 
     // The customer's ledger begins on 1 January and says so with a devir, so
-    // the supplier's three 2025-dated adjustment rows sit before the window
-    // both sides can speak to. They are folded into what the supplier carried
-    // in rather than compared against months the customer never sent.
+    // the supplier's 2025-dated rows sit before the window both sides can
+    // speak to.
     expect(result.period.common?.start).toBe('2026-01-01');
-    expect(result.period.misaligned).toBe(true);
-    expect(result.excluded.creditorSettled).toBe(132);
-    // Neither side is short: the overlap starts where the customer's ledger
-    // does, and nothing before it is in dispute.
-    expect(result.period.shortSide).toBeNull();
+
+    // And the extract is called what it is, so nobody signs its total.
+    expect(result.actions.some((a) => a.category === 'incompleteExtract')).toBe(true);
   });
 });

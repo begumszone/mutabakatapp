@@ -106,7 +106,6 @@ export function buildStatement(file: ParsedFile, mapping: ColumnMapping): BuildR
         id: `r${index}`,
         sourceRow: index + 1,
         date,
-        dueDate: parseDate(row[mapping.dueDate ?? ''] as string | number),
         docNo,
         docKey: normalizeDocNo(docNo),
         docKeyLoose: normalizeDocNoLoose(docNo),

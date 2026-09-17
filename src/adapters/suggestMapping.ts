@@ -292,7 +292,6 @@ export function suggestMapping(file: ParsedFile): ColumnMapping {
   };
 
   const date = pickDate('date');
-  const dueDate = pickDate('dueDate');
 
   const docNoRanked = rank(headers, FIELDS.docNo);
   const docNo = docNoRanked[0] ?? null;
@@ -312,7 +311,6 @@ export function suggestMapping(file: ParsedFile): ColumnMapping {
 
   return {
     date,
-    dueDate,
     docNo,
     docNoAlt,
     docTypeColumn: rank(headers, FIELDS.docTypeColumn)[0] ?? null,
@@ -338,6 +336,5 @@ export function validateMapping(mapping: ColumnMapping): MappingIssue[] {
     issues.push({ severity: 'error', messageKey: 'mapping.missingAmount' });
   }
   if (!mapping.docNo) issues.push({ severity: 'warning', messageKey: 'mapping.missingDocNo' });
-  if (!mapping.dueDate) issues.push({ severity: 'warning', messageKey: 'mapping.missingDueDate' });
   return issues;
 }

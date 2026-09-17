@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import type { AgingBucket, Locale, MatchedPair, PairReconciliation, UnmatchedEntry } from '../types';
+import type { Locale, MatchedPair, PairReconciliation, UnmatchedEntry } from '../types';
 import { translate } from '../lib/i18n';
 import { formatDate, formatMoney } from '../lib/formatters';
 import { exportReconciliation } from '../lib/exportXlsx';
@@ -19,9 +19,7 @@ interface Props {
   onBack: () => void;
 }
 
-const BUCKETS: AgingBucket[] = ['notDue', 'd1to30', 'd31to60', 'd61to90', 'd90plus'];
-
-type Tab = 'actions' | 'aging' | 'missing' | 'mismatch' | 'matched';
+type Tab = 'actions' | 'missing' | 'mismatch' | 'matched';
 
 /**
  * Colour carries meaning here, so it is spent carefully.
@@ -43,7 +41,7 @@ function claimClass(value: number): string {
 export function ResultView({ locale, result, onRestart, onBack }: Props) {
   const t = (key: string, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
-  const { bridge, match, allocation, actions, creditor, debtor, currency } = result;
+  const { bridge, match, actions, creditor, debtor, currency } = result;
   const [tab, setTab] = useState<Tab>('actions');
   const money = (value: number) => formatMoney(value, locale, currency);
 
@@ -62,29 +60,77 @@ export function ResultView({ locale, result, onRestart, onBack }: Props) {
     return day.toISOString().slice(0, 10);
   }, [result.period.common]);
 
+  /**
+   * The gap, taken apart.
+   *
+   * `buildBridge` asserts one identity and this is it, written out so a
+   * person can follow it: the difference between two closing balances is what
+   * the two sides carried in differently, plus the documents only one of them
+   * booked, plus the ones they booked at two different figures. Nothing else
+   * can move a balance, so whatever is left over is named as unexplained
+   * rather than rounded away.
+   */
+  const openingMismatch = Math.abs(bridge.openingDifference) > 0.01;
+  const deriveRows = useMemo(() => {
+    const missing = Math.round((bridge.creditorOnlyTotal - bridge.debtorOnlyTotal) * 100) / 100;
+    const explained =
+      Math.round((bridge.openingDifference + missing + bridge.amountDifferences) * 100) / 100;
+    const unexplained = Math.round((bridge.difference - explained) * 100) / 100;
+    return [
+      {
+        key: 'opening',
+        step: '1',
+        label: t('derive.opening', { date: formatDate(openingDate ?? '', locale) }),
+        note: openingMismatch ? t('derive.openingNote') : t('derive.openingClean'),
+        amount: bridge.openingDifference,
+        emphasis: false,
+      },
+      {
+        key: 'missing',
+        step: '2',
+        label: t('derive.missing'),
+        note: null,
+        amount: missing,
+        emphasis: false,
+      },
+      {
+        key: 'amounts',
+        step: '3',
+        label: t('derive.amounts'),
+        note: null,
+        amount: bridge.amountDifferences,
+        emphasis: false,
+      },
+      {
+        key: 'total',
+        step: '=',
+        label: t('derive.total'),
+        note: null,
+        amount: explained,
+        emphasis: true,
+      },
+      ...(Math.abs(unexplained) > 0.01
+        ? [
+            {
+              key: 'unexplained',
+              step: '!',
+              label: t('derive.unexplained'),
+              note: null,
+              amount: unexplained,
+              emphasis: true,
+            },
+          ]
+        : []),
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bridge, openingDate, locale]);
+
   const mismatches = useMemo(
     () => match.pairs.filter((pair) => Math.abs(pair.amountDifference) >= 0.01),
     [match.pairs],
   );
 
-  const buckets = useMemo(() => {
-    const totals: Record<AgingBucket, number> = {
-      notDue: 0, d1to30: 0, d31to60: 0, d61to90: 0, d90plus: 0,
-    };
-    for (const invoice of allocation.invoices) {
-      if (invoice.open <= 0.01) continue;
-      totals[invoice.bucket] += invoice.open;
-    }
-    return totals;
-  }, [allocation.invoices]);
 
-  const openInvoices = useMemo(
-    () =>
-      allocation.invoices
-        .filter((invoice) => invoice.open > 0.01)
-        .sort((a, b) => b.daysOverdue - a.daysOverdue || b.open - a.open),
-    [allocation.invoices],
-  );
 
   const download = async () => {
     const blob = await exportReconciliation(result, locale);
@@ -193,15 +239,6 @@ export function ResultView({ locale, result, onRestart, onBack }: Props) {
         </div>
       )}
 
-      {result.excluded.active && (
-        <div className="notice info">
-          {t('result.excluded', {
-            creditorSettled: result.excluded.creditorSettled,
-            debtorSettled: result.excluded.debtorSettled,
-            openingLines: result.excluded.openingLines,
-          })}
-        </div>
-      )}
 
       <section className="card">
         <div className="card-head">
@@ -258,13 +295,56 @@ export function ResultView({ locale, result, onRestart, onBack }: Props) {
         </table>
       </section>
 
+      <section className="card derivation">
+        <div className="card-head">
+          <h2>{t('derive.title')}</h2>
+        </div>
+        <div className="card-body">
+          <p>
+            {t('derive.lead', {
+              creditor: creditor.name,
+              debtor: debtor.name,
+              date: formatDate(result.asOfDate, locale),
+              creditorBalance: money(bridge.creditorBalance),
+              debtorBalance: money(bridge.debtorBalance),
+              difference: money(bridge.difference),
+            })}
+          </p>
+          <table className="derive-table">
+            <tbody>
+              {deriveRows.map((row) => (
+                <tr key={row.key} className={row.emphasis ? 'emphasis' : undefined}>
+                  <td className="step">{row.step}</td>
+                  <td>
+                    {row.label}
+                    {row.note && <div className="faint small">{row.note}</div>}
+                  </td>
+                  <td className={`n num ${diffClass(row.amount)}`}>{money(row.amount)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {openingMismatch && (
+            <div className="notice error" style={{ marginTop: 12 }}>
+              {t('derive.checkPrior', {
+                date: formatDate(openingDate ?? '', locale),
+                creditor: creditor.name,
+                debtor: debtor.name,
+                creditorOpening: money(bridge.creditorOpening),
+                debtorOpening: money(bridge.debtorOpening),
+                difference: money(bridge.openingDifference),
+              })}
+            </div>
+          )}
+        </div>
+      </section>
+
       <section className="card">
         <div className="card-head">
           <div className="tabs">
             {(
               [
                 ['actions', t('result.actions'), actions.length],
-                ['aging', t('result.aging'), openInvoices.length],
                 ['missing', 'Eksik kayıtlar', match.creditorOnly.length + match.debtorOnly.length],
                 ['mismatch', t('result.amountMismatch'), mismatches.length],
                 ['matched', t('result.matched'), match.pairs.length],
@@ -299,54 +379,6 @@ export function ResultView({ locale, result, onRestart, onBack }: Props) {
             </div>
           ))}
 
-        {tab === 'aging' && (
-          <div className="stack card-body">
-            <div className="buckets">
-              {BUCKETS.map((bucket) => (
-                <div
-                  className={bucket === 'd90plus' && buckets[bucket] > 0 ? 'bucket hot' : 'bucket'}
-                  key={bucket}
-                >
-                  <div className="label">{t(`aging.${bucket}`)}</div>
-                  <div className="value">{money(buckets[bucket])}</div>
-                </div>
-              ))}
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{t('table.date')}</th>
-                    <th>{t('table.docNo')}</th>
-                    <th>{t('table.dueDate')}</th>
-                    <th className="n">{t('table.amount')}</th>
-                    <th className="n">{t('table.open')}</th>
-                    <th className="n">{t('table.daysOverdue')}</th>
-                    <th>{t('table.bucket')}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {openInvoices.map((invoice) => (
-                    <tr key={invoice.entry.id}>
-                      <td>{formatDate(invoice.entry.date, locale)}</td>
-                      <td className="num">{invoice.entry.docNo || '—'}</td>
-                      <td>
-                        {invoice.dueDate === null ? '—' : formatDate(invoice.dueDate, locale)}
-                      </td>
-                      <td className="n num">{money(invoice.amount)}</td>
-                      <td className="n num">{money(invoice.open)}</td>
-                      <td className={`n num ${invoice.daysOverdue > 0 ? 'neg' : ''}`}>
-                        {invoice.daysOverdue > 0 ? invoice.daysOverdue : '—'}
-                      </td>
-                      <td>{t(`aging.${invoice.bucket}`)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {openInvoices.length === 0 && <div className="empty">{t('result.noRows')}</div>}
-          </div>
-        )}
 
         {tab === 'missing' && (
           <div className="stack" style={{ gap: 0 }}>

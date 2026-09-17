@@ -79,7 +79,6 @@ const tr: Dict = {
   'mapping.debitCredit': 'Ayrı borç / alacak kolonları',
   'mapping.signed': 'Tek işaretli tutar kolonu',
   'mapping.field.date': 'Tarih',
-  'mapping.field.dueDate': 'Vade tarihi',
   'mapping.field.docNo': 'Belge / fiş no',
   'mapping.field.docNoAlt': 'İkinci belge no',
   'mapping.field.docTypeColumn': 'Belge türü',
@@ -94,7 +93,6 @@ const tr: Dict = {
   'mapping.missingAmount': 'Tutar kolonu seçilmedi.',
   'mapping.missingDebitCredit': 'Borç ve alacak kolonlarından en az biri seçilmeli.',
   'mapping.missingDocNo': 'Belge no seçilmedi — eşleştirme yalnız tarih ve tutara dayanacak.',
-  'mapping.missingDueDate': 'Vade kolonu yok. Bu ekstredeki faturalar için gecikme hesaplanmayacak.',
   'mapping.rowsRead': '{count} satır okundu',
   'mapping.skippedNoDate': '{count} satır tarihi okunamadığı için atlandı',
   'mapping.skippedFooter': '{count} toplam satırı atlandı',
@@ -122,34 +120,38 @@ const tr: Dict = {
     'Şu sütunlar tutar taşıyor ama hangisinin borç, hangisinin alacak olduğu verilerden anlaşılmıyor: {columns}. Aşağıdan seçin.',
   'mapping.balanceColumns':
     'Şu sütun(lar) yürüyen bakiye gibi davranıyor, hareket değil — toplama katılmamalı: {columns}.',
-  'settings.askPeriod': '1. Hangi tarih aralığı için mutabakat yapmak istiyorsunuz?',
+  'settings.askStart': '2. Karşılaştırma hangi tarihten itibaren yapılsın?',
   'settings.periodStart': 'Başlangıç tarihi',
-  'settings.periodEnd': 'Bitiş tarihi',
-  'settings.periodHint':
-    'Bu aralığın dışında kalan satırlar “dönem dışı” olarak ayrılır; eksik kayıt sayılmaz. Cari hesap mutabakatı genelde yıl başından itibaren yapılır, ama iki ya da üç yıllık ekstre de karşılaştırılabilir.',
+  'settings.startHint':
+    'Bu tarihten öncesi tek bir devir rakamına indirgenir ve {opening} devir bakiyesi olarak iki tarafta ayrı ayrı kontrol edilir. Cari hesap mutabakatı genelde yıl başından itibaren yapılır; devirde şüphe varsa iki ya da üç yıl geriye gidilir.',
   'settings.preset.ytd': 'Bu yıl',
   'settings.preset.lastYear': 'Geçen yıl',
   'settings.preset.twoYears': 'Son 2 yıl',
   'settings.preset.threeYears': 'Son 3 yıl',
-  'settings.askAsOf': '2. Hangi tarihteki bakiyede mutabık kalmak istiyorsunuz?',
+  'settings.askAsOf': '1. Hangi tarih itibarıyla mutabakat yapılacak?',
   'settings.asOfHint':
-    'Ekstre 01.01.2026–05.08.2026 aralığını kapsıyor olabilir ama 30.06.2026 bakiyesinde mutabık kalmak isteyebilirsiniz. Bu tarihten sonraki satırlar bakiyeye girmez, ayrıca gösterilir.',
+    'Bu tarihe kadar olan hesap hareketleri karşılaştırılır ve bu tarihteki bakiyede mutabık kalınır. Ekstre 01.01.2026–05.08.2026 aralığını kapsıyor olsa bile, 30.06.2026 yazarsanız sonraki satırlar bakiyeye girmez.',
   'settings.advanced': 'Gelişmiş eşleştirme ayarları',
-  'settings.openItemsAuto':
-    'Yüklenen ekstrelerden biri kapatma belgesi taşıyor, yani bir açık kalem listesi. Bakiye, kapatılmamış satırların toplamı olarak okunuyor — bu ekstrelerin doğru okunma biçimi budur.',
   'settings.asOf': 'Mutabakat tarihi',
   'settings.amountTolerance': 'Tutar toleransı',
   'settings.dayTolerance': 'Gün toleransı',
   'settings.fallback': 'Belge no yoksa tarih + tutar ile eşleştir',
-  'settings.openItems': 'Sadece açık kalemler üzerinden mutabakat',
-  'settings.openItemsHint':
-    'Ekstre hangi satırlarının kapandığını söylüyorsa (clearing belgesi), kapanmış belgeler ve karşı taraftaki eşleri karşılaştırmadan çıkarılır. İki taraf da "hâlâ ne borçlu" tabanında karşılaştırılır. Ekstrenizde kapanış kolonu bulunduğu için otomatik açıldı.',
-  'settings.openItemsUnavailable':
-    'Yüklenen ekstrelerde kapanış (clearing) belgesi kolonu yok; tüm satırlar karşılaştırılacak.',
-  'result.excluded':
-    'Açık kalem modu: {creditorSettled} kapanmış alacaklı satırı, {debtorSettled} kapanmış borçlu satırı ve {openingLines} devir satırı karşılaştırma dışında tutuldu. Devir aşağıda ayrıca raporlanıyor.',
 
   'result.back': 'Ayarlara dön',
+  'action.incompleteExtract':
+    '{party} ekstresi eksik bir defter: kapatma belgesi taşıyor ve başlangıcından önce kesilmiş faturaların ödemelerini içeriyor. Satırların toplamı {summed}, oysa kapanmamış satırların toplamı {openTotal}. Bu ekstrenin toplamı bakiye değildir — {party} tarafından dönemin tamamını kapsayan cari ekstre isteyin.',
+  'derive.title': 'Fark nasıl bulundu?',
+  'derive.lead':
+    '{creditor} {date} itibarıyla {creditorBalance}, {debtor} ise {debtorBalance} diyor. Aradaki {difference} tutarındaki fark aşağıdaki kalemlerin toplamıdır — başka hiçbir şey bir bakiyeyi değiştiremez.',
+  'derive.opening': 'Devirden gelen fark ({date} kapanışı)',
+  'derive.openingNote': 'Bu fark dönem başlamadan önce doğmuş.',
+  'derive.openingClean': 'Devir tutuyor, fark dönem içinde doğmuş.',
+  'derive.missing': 'Bir tarafta olup diğerinde olmayan kayıtlar',
+  'derive.amounts': 'Aynı belgenin iki tarafta farklı tutarla kaydedilmesi',
+  'derive.total': 'Açıklanan toplam',
+  'derive.unexplained': 'Açıklanamayan',
+  'derive.checkPrior':
+    '{date} kapanış bakiyeleri tutmuyor: {creditor} {creditorOpening}, {debtor} {debtorOpening}. Devirden gelen fark {difference}. Bu dönemin mutabakatı, önceki dönem kapatılmadan imzalanmamalıdır.',
   'result.balanceToday': 'Bugünkü Bakiye',
   'result.balanceAt': '{date} Bakiyesi',
   'result.openingAt': '{date} Devir',
@@ -172,7 +174,6 @@ const tr: Dict = {
   'result.amountMismatch': 'İki tarafın farklı tutarla kaydettiği belgeler',
   'result.noRows': 'Bu başlıkta kayıt yok.',
   'result.actions': 'Alınacak aksiyonlar',
-  'result.aging': 'Açık faturalar ve yaşlandırma',
   'result.export': 'Sonuç tablosunu indir (.xlsx)',
   'result.restart': 'Yeni mutabakat',
   'result.explanation': 'Açıklama',
@@ -190,10 +191,6 @@ const tr: Dict = {
   'table.debtorAmount': '{name} tutarı',
   'table.diff': 'Fark',
   'table.basis': 'Eşleşme',
-  'table.dueDate': 'Vade',
-  'table.open': 'Açık tutar',
-  'table.daysOverdue': 'Gecikme (gün)',
-  'table.bucket': 'Yaşlandırma',
   'table.row': 'Satır',
 
   'basis.docNoAndAmount': 'Belge no + tutar',
@@ -204,14 +201,6 @@ const tr: Dict = {
   'basis.amountOnly': 'Yalnız tutar',
   'basis.manual': 'Elle',
 
-  'aging.notDue': 'Vadesi gelmemiş',
-  'aging.d1to30': '1-30 gün',
-  'aging.d31to60': '31-60 gün',
-  'aging.d61to90': '61-90 gün',
-  'aging.d90plus': '90+ gün',
-  'aging.totalOpen': 'Toplam açık',
-  'aging.overdue': 'Vadesi geçmiş',
-  'aging.dueFromTerm': 'vade fatura tarihine {days} gün eklenerek hesaplandı',
 
   'action.balanceAgreed':
     '{creditor} ile {debtor} bakiyeleri, eksik kayıtlar işlendikten sonra birebir tutuyor. Mutabakat mektubu imzaya hazır.',
@@ -231,14 +220,10 @@ const tr: Dict = {
     '{docNo} numaralı belgede tutarlar arasındaki oran {rate} — kur farkından kaynaklanıyor olabilir. İki tarafın kullandığı kuru karşılaştırın.',
   'action.amountMismatchRate':
     '{docNo} numaralı belgede iki tarafın tutarı %{percent} farklı — iki taraf aynı dövizli faturayı farklı kurdan çevirmiş olabilir. Kullanılan kurları karşılaştırın ve kur farkı faturası kesilmesi gerekip gerekmediğine bakın.',
-  'action.overdue':
-    '{docNo} numaralı fatura {days} gündür vadesi geçmiş (vade {dueDate}). {debtor} tarafından tahsilat takibi yapılmalı.',
   'action.periodGap':
     'İki ekstre farklı dönemleri kapsıyor. Ortak dönem {commonStart} tarihinde başlıyor ve o tarihteki devirler tutmuyor: {creditor} {creditorOpening}, {debtor} {debtorOpening} — arada {difference} fark var. Bu fark ortak dönemden ÖNCE oluşmuş, dolayısıyla eldeki verilerle açıklanamaz. {shortParty} firmasından {neededFrom} tarihinden itibaren ekstre isteyin.',
   'action.missingOpening':
     '{party} ekstresinde devir (açılış bakiyesi) satırı yok; {date} devri sıfır kabul edildi. Devir varsa mutabakat ayarlarından elle girin, yoksa sonuç yanıltıcı olur.',
-  'action.unappliedPayment':
-    '{count} tahsilat hiçbir faturaya kapatılamadı. Avans olabilir ya da eksik fatura kaydına işaret ediyor olabilir.',
 
   'severity.critical': 'Kritik',
   'severity.warning': 'Önemli',
@@ -321,7 +306,6 @@ const en: Dict = {
   'mapping.debitCredit': 'Separate debit / credit columns',
   'mapping.signed': 'One signed amount column',
   'mapping.field.date': 'Date',
-  'mapping.field.dueDate': 'Due date',
   'mapping.field.docNo': 'Document number',
   'mapping.field.docNoAlt': 'Second reference',
   'mapping.field.docTypeColumn': 'Document type',
@@ -336,7 +320,6 @@ const en: Dict = {
   'mapping.missingAmount': 'No amount column selected.',
   'mapping.missingDebitCredit': 'Select at least one of the debit and credit columns.',
   'mapping.missingDocNo': 'No document number — matching will rely on date and amount alone.',
-  'mapping.missingDueDate': 'No due-date column. Invoices on this statement will not be aged.',
   'mapping.rowsRead': '{count} rows read',
   'mapping.skippedNoDate': '{count} rows skipped for having no readable date',
   'mapping.skippedFooter': '{count} total rows skipped',
@@ -364,35 +347,39 @@ const en: Dict = {
     'These columns hold money, but the data does not say which is debit and which is credit: {columns}. Choose below.',
   'mapping.balanceColumns':
     'These column(s) behave like a running balance rather than a movement, so they must not be summed: {columns}.',
-  'settings.askPeriod': '1. Which date range do you want to reconcile?',
+  'settings.askStart': '2. From which date should the comparison run?',
   'settings.periodStart': 'Start date',
-  'settings.periodEnd': 'End date',
-  'settings.periodHint':
-    'Rows outside this range are set aside as out of period rather than reported as missing records. Reconciliation usually runs from the start of the year, but two or three years of statements can be compared at once.',
+  'settings.startHint':
+    'Everything before this date collapses into a single carried-forward figure, and the opening balance at {opening} is checked on both sides. Reconciliation usually runs from the start of the year; go back two or three years when the opening itself is in doubt.',
   'settings.preset.ytd': 'This year',
   'settings.preset.lastYear': 'Last year',
   'settings.preset.twoYears': 'Last 2 years',
   'settings.preset.threeYears': 'Last 3 years',
-  'settings.askAsOf': '2. Which date do you want to agree the balance at?',
+  'settings.askAsOf': '1. As at which date should the reconciliation be made?',
   'settings.asOfHint':
-    'A statement may run from 01.01.2026 to 05.08.2026 while the balance being signed off is the one at 30.06.2026. Rows after this date never enter the balance; they are reported separately.',
+    'Movements up to this date are compared, and it is the balance at this date that gets agreed. A statement may run to 05.08.2026 while 30.06.2026 is the date being signed — later rows then never enter the balance.',
   'settings.advanced': 'Advanced matching settings',
-  'settings.openItemsAuto':
-    'One of the uploaded statements names the document that closed each line, so it is an open-item list. Its balance is read as the sum of the lines still open — which is how such an extract is meant to be read.',
   'settings.asOf': 'Balance date',
   'settings.amountTolerance': 'Amount tolerance',
   'settings.dayTolerance': 'Day tolerance',
   'settings.fallback': 'Match on date + amount when there is no document number',
-  'settings.openItems': 'Reconcile open items only',
-  'settings.openItemsHint':
-    'Where an export says which of its lines are closed, settled documents and their counterparts on the other side drop out, so both sides are compared on what is still owed. Switched on automatically because a clearing column was found.',
-  'settings.openItemsUnavailable':
-    'Neither upload carries a clearing-document column, so every line will be compared.',
-  'result.excluded':
-    'Open-item mode: {creditorSettled} settled creditor lines, {debtorSettled} settled debtor lines and {openingLines} opening lines were left out of the comparison. The opening is reported separately below.',
 
   'result.balanceToday': 'Closing balance',
   'result.back': 'Back to setup',
+  'action.incompleteExtract':
+    '{party}’s statement is not a complete ledger: it names the document that closed each line and carries settlements for invoices raised before it begins. Its rows total {summed}, while the lines still open total {openTotal}. That total is not a balance — ask {party} for a statement covering the whole period.',
+  'derive.title': 'How was the difference found?',
+  'derive.lead':
+    '{creditor} says {creditorBalance} as at {date}; {debtor} says {debtorBalance}. The {difference} between them is the sum of the items below — nothing else can move a balance.',
+  'derive.opening': 'Carried forward from the opening ({date} close)',
+  'derive.openingNote': 'This part of the gap was already there before the period began.',
+  'derive.openingClean': 'The opening agrees; the gap arose inside the period.',
+  'derive.missing': 'Records one side booked and the other did not',
+  'derive.amounts': 'The same document booked at two different amounts',
+  'derive.total': 'Total explained',
+  'derive.unexplained': 'Unexplained',
+  'derive.checkPrior':
+    'The closing balances at {date} do not agree: {creditor} {creditorOpening}, {debtor} {debtorOpening}. The opening gap is {difference}. This period should not be signed off before the previous one is closed.',
   'result.balanceAt': 'Balance at {date}',
   'result.openingAt': 'Opening (devir) at {date}',
   'result.opening': 'Opening (devir)',
@@ -414,7 +401,6 @@ const en: Dict = {
   'result.amountMismatch': 'Documents booked at different amounts',
   'result.noRows': 'Nothing here.',
   'result.actions': 'Recommended actions',
-  'result.aging': 'Open invoices and ageing',
   'result.export': 'Download the result table (.xlsx)',
   'result.restart': 'New reconciliation',
   'result.explanation': 'Explanation',
@@ -432,10 +418,6 @@ const en: Dict = {
   'table.debtorAmount': '{name} amount',
   'table.diff': 'Difference',
   'table.basis': 'Matched on',
-  'table.dueDate': 'Due',
-  'table.open': 'Open',
-  'table.daysOverdue': 'Days overdue',
-  'table.bucket': 'Ageing',
   'table.row': 'Row',
 
   'basis.docNoAndAmount': 'Document no + amount',
@@ -446,14 +428,6 @@ const en: Dict = {
   'basis.amountOnly': 'Amount only',
   'basis.manual': 'Manual',
 
-  'aging.notDue': 'Not yet due',
-  'aging.d1to30': '1-30 days',
-  'aging.d31to60': '31-60 days',
-  'aging.d61to90': '61-90 days',
-  'aging.d90plus': '90+ days',
-  'aging.totalOpen': 'Total open',
-  'aging.overdue': 'Overdue',
-  'aging.dueFromTerm': 'due date derived by adding {days} days to the invoice date',
 
   'action.balanceAgreed':
     '{creditor} and {debtor} agree exactly once the missing records are booked. The reconciliation letter is ready to sign.',
@@ -473,14 +447,10 @@ const en: Dict = {
     'On document {docNo} the two amounts differ by a factor of {rate} — possibly an FX rate difference. Compare the rates each side used.',
   'action.amountMismatchRate':
     'On document {docNo} the two amounts differ by {percent}% — most likely the same foreign-currency invoice converted at two different rates. Compare the rates used and check whether an FX difference invoice is needed.',
-  'action.overdue':
-    'Invoice {docNo} is {days} days past due (due {dueDate}). {debtor} should be chased for payment.',
   'action.periodGap':
     'The two statements cover different periods. The overlap begins on {commonStart} and the balances carried into it do not agree: {creditor} {creditorOpening}, {debtor} {debtorOpening} — a gap of {difference}. That gap arose BEFORE the overlap, so nothing in the data can explain it. Ask {shortParty} for a statement from {neededFrom}.',
   'action.missingOpening':
     '{party}’s statement carries no opening (devir) line, so the balance at {date} was taken as zero. If there is an opening, enter it in the settings — otherwise the result is misleading.',
-  'action.unappliedPayment':
-    '{count} payments could not be applied to any invoice. They may be advances, or point to invoices never booked.',
 
   'severity.critical': 'Critical',
   'severity.warning': 'Important',

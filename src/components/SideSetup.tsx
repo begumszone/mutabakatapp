@@ -38,7 +38,6 @@ interface Props {
 
 const TEXT_FIELDS: (keyof ColumnMapping)[] = [
   'date',
-  'dueDate',
   'docNo',
   'docNoAlt',
   'description',

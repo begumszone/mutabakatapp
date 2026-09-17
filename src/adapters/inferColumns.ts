@@ -157,7 +157,7 @@ export interface InferredColumns {
 }
 
 const EMPTY_MAPPING: ColumnMapping = {
-  date: null, dueDate: null, docNo: null, docNoAlt: null, docTypeColumn: null,
+  date: null, docNo: null, docNoAlt: null, docTypeColumn: null,
   description: null, amountLayout: 'debitCredit', debit: null, credit: null,
   amount: null, currency: null, clearingDoc: null,
 };
@@ -165,8 +165,7 @@ const EMPTY_MAPPING: ColumnMapping = {
 /**
  * Works out what each unnamed column is, from what it holds.
  *
- * Dates are taken by coverage, the earliest-filled one being the posting date
- * and a later one the vade. Money columns are found, running balances are
+ * The date column is the one that dates most of the sheet. Money columns are found, running balances are
  * ruled out by the arithmetic above, and what remains is read as either one
  * signed movement column or a borç/alacak pair. When two money columns remain
  * and nothing distinguishes them, both are reported as ambiguous rather than
@@ -213,7 +212,6 @@ export function inferColumns(file: ParsedFile): InferredColumns {
 
   const mapping: ColumnMapping = { ...EMPTY_MAPPING };
   mapping.date = dateCols[0] ?? null;
-  mapping.dueDate = dateCols[1] ?? null;
 
   /*
    * The document number, and which of two candidates it should be.

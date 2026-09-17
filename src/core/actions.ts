@@ -1,13 +1,14 @@
 import type {
   ActionSeverity,
-  AllocationResult,
   BalanceBridge,
   MatchResult,
   MatchedPair,
   Party,
   PeriodAlignment,
   RecommendedAction,
+  Statement,
 } from '../types';
+import { claimOf } from './claim';
 import { round2 } from './parseNumber';
 
 /** Common VAT ratios, so a mismatch that is exactly the tax can be named. */
@@ -89,12 +90,35 @@ function classifyAmountDifference(pair: MatchedPair): {
   return { key: 'action.amountMismatch', vars: base };
 }
 
+/**
+ * True when an extract is an open-item list rather than a complete ledger.
+ *
+ * SAP-style exports name the document that closed each line, and they carry
+ * settlements for invoices raised before the extract begins. Their rows
+ * therefore do not add up to a balance: on one real file the rows total
+ * 30.467,42 while the balance both firms signed was 501.717,37, the sum of
+ * the lines still open. Summing such a sheet is arithmetic on an incomplete
+ * ledger, and the only honest thing to do is say so.
+ */
+function looksIncomplete(statement: Statement): number | null {
+  if (!statement.entries.some((entry) => entry.clearingDoc !== '')) return null;
+  let all = 0;
+  let open = 0;
+  for (const entry of statement.entries) {
+    const claim = claimOf(entry, statement.perspective);
+    all += claim;
+    if (entry.clearingDoc === '') open += claim;
+  }
+  return Math.abs(round2(all - open)) > 0.01 ? round2(open) : null;
+}
+
 export interface ActionInput {
   creditor: Party;
   debtor: Party;
   match: MatchResult;
+  creditorStatement: Statement;
+  debtorStatement: Statement;
   bridge: BalanceBridge;
-  allocation: AllocationResult;
   /** Differences at or above this size are worth a phone call. */
   materiality: number;
   period: PeriodAlignment;
@@ -122,8 +146,27 @@ function isYearEnd(iso: string): boolean {
 }
 
 export function buildActions(input: ActionInput): RecommendedAction[] {
-  const { creditor, debtor, match, bridge, allocation, materiality, period } = input;
+  const { creditor, debtor, match, bridge, materiality, period } = input;
   const actions: RecommendedAction[] = [];
+
+  // Before any figure is believed: is the sheet it came from a ledger at all?
+  for (const [party, statement, balance] of [
+    [creditor, input.creditorStatement, bridge.creditorBalance],
+    [debtor, input.debtorStatement, bridge.debtorBalance],
+  ] as [Party, Statement, number][]) {
+    const openTotal = looksIncomplete(statement);
+    if (openTotal === null) continue;
+    actions.push({
+      id: `incomplete-${party.id}`,
+      severity: 'critical',
+      category: 'incompleteExtract',
+      ownerPartyId: party.id,
+      amount: openTotal,
+      messageKey: 'action.incompleteExtract',
+      messageVars: { party: party.name, summed: balance, openTotal },
+      entryIds: [],
+    });
+  }
 
   // Before anything inside the window: can the window be trusted at all?
   if (period.shortSide && period.neededFrom) {
@@ -285,39 +328,6 @@ export function buildActions(input: ActionInput): RecommendedAction[] {
     });
   }
 
-  for (const invoice of allocation.invoices) {
-    if (invoice.open <= 0.01) continue;
-    if (invoice.daysOverdue > 0) {
-      actions.push({
-        id: `overdue-${invoice.entry.id}`,
-        severity: invoice.daysOverdue > 60 ? 'critical' : 'warning',
-        category: 'overdue',
-        ownerPartyId: debtor.id,
-        amount: invoice.open,
-        messageKey: 'action.overdue',
-        messageVars: {
-          docNo: invoice.entry.docNo,
-          days: invoice.daysOverdue,
-          dueDate: invoice.dueDate ?? '',
-          debtor: debtor.name,
-        },
-        entryIds: [invoice.entry.id],
-      });
-    }
-  }
-
-  if (allocation.unappliedPayments > 0.01) {
-    actions.push({
-      id: 'unapplied-payments',
-      severity: 'warning',
-      category: 'unappliedPayment',
-      ownerPartyId: creditor.id,
-      amount: allocation.unappliedPayments,
-      messageKey: 'action.unappliedPayment',
-      messageVars: { count: allocation.unappliedPaymentIds.length },
-      entryIds: allocation.unappliedPaymentIds,
-    });
-  }
 
   const rank: Record<ActionSeverity, number> = { critical: 0, warning: 1, info: 2 };
   actions.sort((a, b) => {

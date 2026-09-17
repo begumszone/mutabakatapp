@@ -20,7 +20,6 @@ function entry(
     id,
     sourceRow: Number(id.replace(/\D/g, '')) || 1,
     date,
-    dueDate: null,
     docNo,
     docKey: normalizeDocNo(docNo),
     docKeyLoose: normalizeDocNoLoose(docNo),
@@ -51,7 +50,6 @@ const settings: ReconciliationSettings = {
   amountTolerance: 0.01,
   dayTolerance: 7,
   allowDateAmountFallback: true,
-  openItemsOnly: false,
   requestedPeriod: null,
   asOfDate: '2026-08-31',
 };
@@ -279,66 +277,6 @@ describe('naming the cause of a difference', () => {
   });
 });
 
-describe('payment allocation and ageing', () => {
-  it('settles many invoices from one bulk payment, oldest first', () => {
-    const creditor = statement('a', 'receivable', [
-      entry('c1', '2026-06-01', 'FTR2026000101', 10000, 0),
-      entry('c2', '2026-06-05', 'FTR2026000102', 10000, 0),
-      entry('c3', '2026-06-10', 'FTR2026000103', 10000, 0),
-      entry('c4', '2026-07-15', 'BULK', 0, 25000),
-    ]);
-    const debtor = statement('b', 'payable', [entry('d4', '2026-07-15', 'BULK', 25000, 0)]);
-    const { allocation } = reconcilePair(abc, begum, creditor, debtor, settings);
-
-    const byDoc = new Map(allocation.invoices.map((i) => [i.entry.docNo, i]));
-    expect(byDoc.get('FTR2026000101')?.open).toBe(0);
-    expect(byDoc.get('FTR2026000102')?.open).toBe(0);
-    expect(byDoc.get('FTR2026000103')?.open).toBe(5000);
-    expect(allocation.unappliedPayments).toBe(0);
-  });
-
-  it('applies a payment to the invoice it names, not merely the oldest', () => {
-    const creditor = statement('a', 'receivable', [
-      entry('c1', '2026-06-01', 'FTR1001', 10000, 0),
-      entry('c2', '2026-06-05', 'FTR1002', 10000, 0),
-      entry('c3', '2026-07-15', 'BN77', 0, 10000, { description: 'FTR1002 tahsilat' }),
-    ]);
-    const debtor = statement('b', 'payable', []);
-    const { allocation } = reconcilePair(abc, begum, creditor, debtor, settings);
-    const byDoc = new Map(allocation.invoices.map((i) => [i.entry.docNo, i]));
-    expect(byDoc.get('FTR1002')?.open).toBe(0);
-    expect(byDoc.get('FTR1001')?.open).toBe(10000);
-  });
-
-  it('ages an unpaid invoice from its vade and raises an action', () => {
-    const creditor = statement('a', 'receivable', [
-      entry('c1', '2026-06-01', 'FTR2026000101', 10000, 0, { dueDate: '2026-07-01' }),
-    ]);
-    const debtor = statement('b', 'payable', [entry('d1', '2026-06-01', 'FTR2026000101', 0, 10000)]);
-    const result = reconcilePair(abc, begum, creditor, debtor, settings);
-    const invoice = result.allocation.invoices[0];
-    expect(invoice.dueDateSource).toBe('statement');
-    expect(invoice.daysOverdue).toBe(61);
-    expect(invoice.bucket).toBe('d61to90');
-    const overdue = result.actions.find((a) => a.category === 'overdue');
-    expect(overdue?.severity).toBe('critical');
-  });
-
-  it('leaves an invoice with no vade undated rather than inventing one', () => {
-    // There used to be a "payment term (days)" setting that filled this gap.
-    // It meant the app could report "59 gün gecikmiş" on an invoice whose two
-    // firms had never agreed a term -- a figure with nothing behind it.
-    const creditor = statement('a', 'receivable', [entry('c1', '2026-08-15', 'FTR2026000101', 10000, 0)]);
-    const debtor = statement('b', 'payable', [entry('d1', '2026-08-15', 'FTR2026000101', 0, 10000)]);
-    const result = reconcilePair(abc, begum, creditor, debtor, settings);
-    const invoice = result.allocation.invoices[0];
-    expect(invoice.dueDateSource).toBe('none');
-    expect(invoice.dueDate).toBeNull();
-    expect(invoice.daysOverdue).toBe(0);
-    expect(result.actions.some((a) => a.category === 'overdue')).toBe(false);
-  });
-});
-
 describe('presentation of figures that cancel', () => {
   it('never reports a negative zero', () => {
     // Real in IEEE arithmetic, and a difference somebody goes looking for.
@@ -356,8 +294,7 @@ describe('the devir check', () => {
     amountTolerance: 0.01,
     dayTolerance: 7,
     allowDateAmountFallback: true,
-    openItemsOnly: false,
-    requestedPeriod: null,
+      requestedPeriod: null,
     asOfDate: '2026-06-30',
   };
 
@@ -409,8 +346,7 @@ describe('a window the user asked for', () => {
       amountTolerance: 0.01,
       dayTolerance: 7,
       allowDateAmountFallback: true,
-      openItemsOnly: false,
-      requestedPeriod: { start: '2026-01-01', end: '2026-06-30' },
+          requestedPeriod: { start: '2026-01-01', end: '2026-06-30' },
       asOfDate: '2026-06-30',
     });
     expect(result.period.common).toEqual({ start: '2026-01-01', end: '2026-06-30' });
