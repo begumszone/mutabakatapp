@@ -66,9 +66,25 @@ check('“Sadece açık kalemler” kaldırılmış', !/açık kalemler/i.test(s
 check('“Hangi tarih itibarıyla” sorusu var', /Hangi tarih itibarıyla/i.test(settings));
 check('Yıl seçenekleri var', /Bu yıl/.test(settings) && /Son 3 yıl/.test(settings));
 
-const asOf = page.locator('input[type=date]').first();
-await asOf.fill('2026-06-30');
-await page.waitForTimeout(400);
+// The two date controls have to do what they say, not merely be present.
+const asOfBox = page.locator('input[type=date]').nth(0);
+const startBox = page.locator('input[type=date]').nth(1);
+await asOfBox.fill('2026-06-30');
+await page.waitForTimeout(300);
+const starts = [];
+for (const preset of ['Bu yıl', 'Son 2 yıl', 'Son 3 yıl']) {
+  await page.getByRole('button', { name: preset, exact: true }).click();
+  await page.waitForTimeout(250);
+  starts.push(await startBox.inputValue());
+}
+check('Yıl seçenekleri başlangıcı gerçekten değiştiriyor',
+  starts.join() === '2026-01-01,2025-01-01,2024-01-01');
+check('İki seçenek aynı tarihi vermiyor', new Set(starts).size === starts.length);
+check('Mutabakat tarihi seçeneklerden etkilenmiyor',
+  (await asOfBox.inputValue()) === '2026-06-30');
+await page.getByRole('button', { name: 'Bu yıl', exact: true }).click();
+await page.waitForTimeout(250);
+
 await page.getByRole('button', { name: /Mutabakatı çalıştır/i }).click();
 await page.waitForTimeout(1200);
 

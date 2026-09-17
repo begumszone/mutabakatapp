@@ -125,7 +125,6 @@ const tr: Dict = {
   'settings.startHint':
     'Bu tarihten öncesi tek bir devir rakamına indirgenir ve {opening} devir bakiyesi olarak iki tarafta ayrı ayrı kontrol edilir. Cari hesap mutabakatı genelde yıl başından itibaren yapılır; devirde şüphe varsa iki ya da üç yıl geriye gidilir.',
   'settings.preset.ytd': 'Bu yıl',
-  'settings.preset.lastYear': 'Geçen yıl',
   'settings.preset.twoYears': 'Son 2 yıl',
   'settings.preset.threeYears': 'Son 3 yıl',
   'settings.askAsOf': '1. Hangi tarih itibarıyla mutabakat yapılacak?',
@@ -352,7 +351,6 @@ const en: Dict = {
   'settings.startHint':
     'Everything before this date collapses into a single carried-forward figure, and the opening balance at {opening} is checked on both sides. Reconciliation usually runs from the start of the year; go back two or three years when the opening itself is in doubt.',
   'settings.preset.ytd': 'This year',
-  'settings.preset.lastYear': 'Last year',
   'settings.preset.twoYears': 'Last 2 years',
   'settings.preset.threeYears': 'Last 3 years',
   'settings.askAsOf': '1. As at which date should the reconciliation be made?',

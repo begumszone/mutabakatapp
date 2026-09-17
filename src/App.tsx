@@ -214,7 +214,6 @@ function buildSide(side: Side): SideBuild {
  */
 const PERIOD_PRESETS = [
   { key: 'ytd', years: 1 },
-  { key: 'lastYear', years: 1 },
   { key: 'twoYears', years: 2 },
   { key: 'threeYears', years: 3 },
 ] as const;
@@ -228,14 +227,17 @@ type PresetKey = (typeof PERIOD_PRESETS)[number]['key'] | 'custom';
  * balance date falls in. The multi-year options exist because when nobody has
  * reconciled for a while the devir itself is in doubt, and the only way to
  * settle it is to go back far enough to see it formed.
+ *
+ * There is deliberately no "last year" button. Every window ends at the
+ * mutabakat tarihi, so "last year" could only mean "from the start of last
+ * year" — which is what "son 2 yıl" already says. Two buttons that set the
+ * same date are a bug the reader has to discover.
  */
 function presetRange(key: PresetKey, asOf: string): { start: string; end: string } | null {
   const year = Number(asOf.slice(0, 4));
   switch (key) {
     case 'ytd':
       return { start: `${year}-01-01`, end: asOf };
-    case 'lastYear':
-      return { start: `${year - 1}-01-01`, end: asOf };
     case 'twoYears':
       return { start: `${year - 1}-01-01`, end: asOf };
     case 'threeYears':
