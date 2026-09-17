@@ -150,7 +150,7 @@ describe.skipIf(!available)('a real AİR LIQUIDE / AKVATEK export', () => {
       dayTolerance: 7,
       allowDateAmountFallback: true,
       openItemsOnly: true,
-      termDays: 30,
+      requestedPeriod: null,
       asOfDate: '2026-08-31',
     };
 

@@ -106,9 +106,37 @@ const tr: Dict = {
   'mapping.run': 'Mutabakatı çalıştır',
   'mapping.back': 'Geri',
 
+  'setup.tab.sides': 'Taraflar ve sütunlar',
+  'setup.tab.period': 'Dönem ve mutabakat tarihi',
+  'action.openingMismatch':
+    '{date} devir bakiyeleri tutmuyor: {creditor} {creditorOpening}, {debtor} {debtorOpening} — fark {difference}. Bu fark dönem içindeki hiçbir hareketle açıklanamaz; önce önceki dönemin mutabakatı yapılmalıdır.',
+  'action.openingVerified':
+    '{date} devir bakiyesi iki tarafta da aynı: {amount}. Yıl kapanışı devri doğrulanmıştır.',
   'settings.title': 'Mutabakat ayarları',
-  'settings.termDays': 'Vade (gün)',
-  'settings.termDaysHint': 'Ekstrede vade tarihi olmayan faturalar için.',
+  'mapping.whichSheet': 'Bu dosyada {count} sayfa var. Hangisini kullanalım?',
+  'mapping.whichSheetHint':
+    'Yanlış sayfa seçilirse mutabakat başka bir veri üzerinden çalışır ve sonuç doğru görünür ama yanlış olur. Bu yüzden siz seçmeden devam edilmiyor.',
+  'mapping.sheetRows': '{count} satır',
+  'mapping.whichMoney': 'Bu sayfanın sütun başlıkları yok. Hangisi borç, hangisi alacak?',
+  'mapping.whichMoneyHint':
+    'Şu sütunlar tutar taşıyor ama hangisinin borç, hangisinin alacak olduğu verilerden anlaşılmıyor: {columns}. Aşağıdan seçin.',
+  'mapping.balanceColumns':
+    'Şu sütun(lar) yürüyen bakiye gibi davranıyor, hareket değil — toplama katılmamalı: {columns}.',
+  'settings.askPeriod': '1. Hangi tarih aralığı için mutabakat yapmak istiyorsunuz?',
+  'settings.periodStart': 'Başlangıç tarihi',
+  'settings.periodEnd': 'Bitiş tarihi',
+  'settings.periodHint':
+    'Bu aralığın dışında kalan satırlar “dönem dışı” olarak ayrılır; eksik kayıt sayılmaz. Cari hesap mutabakatı genelde yıl başından itibaren yapılır, ama iki ya da üç yıllık ekstre de karşılaştırılabilir.',
+  'settings.preset.ytd': 'Bu yıl',
+  'settings.preset.lastYear': 'Geçen yıl',
+  'settings.preset.twoYears': 'Son 2 yıl',
+  'settings.preset.threeYears': 'Son 3 yıl',
+  'settings.askAsOf': '2. Hangi tarihteki bakiyede mutabık kalmak istiyorsunuz?',
+  'settings.asOfHint':
+    'Ekstre 01.01.2026–05.08.2026 aralığını kapsıyor olabilir ama 30.06.2026 bakiyesinde mutabık kalmak isteyebilirsiniz. Bu tarihten sonraki satırlar bakiyeye girmez, ayrıca gösterilir.',
+  'settings.advanced': 'Gelişmiş eşleştirme ayarları',
+  'settings.openItemsAuto':
+    'Yüklenen ekstrelerden biri kapatma belgesi taşıyor, yani bir açık kalem listesi. Bakiye, kapatılmamış satırların toplamı olarak okunuyor — bu ekstrelerin doğru okunma biçimi budur.',
   'settings.asOf': 'Mutabakat tarihi',
   'settings.amountTolerance': 'Tutar toleransı',
   'settings.dayTolerance': 'Gün toleransı',
@@ -121,7 +149,10 @@ const tr: Dict = {
   'result.excluded':
     'Açık kalem modu: {creditorSettled} kapanmış alacaklı satırı, {debtorSettled} kapanmış borçlu satırı ve {openingLines} devir satırı karşılaştırma dışında tutuldu. Devir aşağıda ayrıca raporlanıyor.',
 
+  'result.back': 'Ayarlara dön',
   'result.balanceToday': 'Bugünkü Bakiye',
+  'result.balanceAt': '{date} Bakiyesi',
+  'result.openingAt': '{date} Devir',
   'result.opening': 'Devir',
   'result.missingTotal': 'Eksik Kayıt Toplamı',
   'result.afterReconciliation': 'Mutabakat Sonrası Bakiye',
@@ -317,10 +348,38 @@ const en: Dict = {
   'mapping.run': 'Run the reconciliation',
   'mapping.back': 'Back',
 
+  'setup.tab.sides': 'Parties and columns',
+  'setup.tab.period': 'Period and balance date',
+  'action.openingMismatch':
+    'The opening (devir) balances at {date} do not agree: {creditor} {creditorOpening}, {debtor} {debtorOpening} — a gap of {difference}. No movement inside the period can explain this; the previous period has to be reconciled first.',
+  'action.openingVerified':
+    'The opening (devir) balance at {date} is the same on both sides: {amount}. The year-end carry-forward is verified.',
   'settings.title': 'Reconciliation settings',
-  'settings.termDays': 'Payment term (days)',
-  'settings.termDaysHint': 'Used for invoices whose statement carries no due date.',
-  'settings.asOf': 'As of date',
+  'mapping.whichSheet': 'This file has {count} sheets. Which one should we use?',
+  'mapping.whichSheetHint':
+    'Picking the wrong sheet reconciles different data and produces a result that looks right and is not. Nothing runs until you choose.',
+  'mapping.sheetRows': '{count} rows',
+  'mapping.whichMoney': 'This sheet has no column headers. Which column is debit, which is credit?',
+  'mapping.whichMoneyHint':
+    'These columns hold money, but the data does not say which is debit and which is credit: {columns}. Choose below.',
+  'mapping.balanceColumns':
+    'These column(s) behave like a running balance rather than a movement, so they must not be summed: {columns}.',
+  'settings.askPeriod': '1. Which date range do you want to reconcile?',
+  'settings.periodStart': 'Start date',
+  'settings.periodEnd': 'End date',
+  'settings.periodHint':
+    'Rows outside this range are set aside as out of period rather than reported as missing records. Reconciliation usually runs from the start of the year, but two or three years of statements can be compared at once.',
+  'settings.preset.ytd': 'This year',
+  'settings.preset.lastYear': 'Last year',
+  'settings.preset.twoYears': 'Last 2 years',
+  'settings.preset.threeYears': 'Last 3 years',
+  'settings.askAsOf': '2. Which date do you want to agree the balance at?',
+  'settings.asOfHint':
+    'A statement may run from 01.01.2026 to 05.08.2026 while the balance being signed off is the one at 30.06.2026. Rows after this date never enter the balance; they are reported separately.',
+  'settings.advanced': 'Advanced matching settings',
+  'settings.openItemsAuto':
+    'One of the uploaded statements names the document that closed each line, so it is an open-item list. Its balance is read as the sum of the lines still open — which is how such an extract is meant to be read.',
+  'settings.asOf': 'Balance date',
   'settings.amountTolerance': 'Amount tolerance',
   'settings.dayTolerance': 'Day tolerance',
   'settings.fallback': 'Match on date + amount when there is no document number',
@@ -333,6 +392,9 @@ const en: Dict = {
     'Open-item mode: {creditorSettled} settled creditor lines, {debtorSettled} settled debtor lines and {openingLines} opening lines were left out of the comparison. The opening is reported separately below.',
 
   'result.balanceToday': 'Closing balance',
+  'result.back': 'Back to setup',
+  'result.balanceAt': 'Balance at {date}',
+  'result.openingAt': 'Opening (devir) at {date}',
   'result.opening': 'Opening (devir)',
   'result.missingTotal': 'Total of missing records',
   'result.afterReconciliation': 'Balance after reconciliation',

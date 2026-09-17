@@ -240,9 +240,13 @@ export interface OpenInvoice {
   paid: number;
   open: number;
   /** Vade from the statement, or invoice date + agreed term. */
-  dueDate: string;
-  /** Whether `dueDate` came from the file or was derived from the term. */
-  dueDateSource: 'statement' | 'term';
+  dueDate: string | null;
+  /**
+   * Where `dueDate` came from. `none` means the statement carried no vade —
+   * an invoice with no agreed due date is not overdue, and inventing one from
+   * a default term produces confident-looking figures nobody agreed to.
+   */
+  dueDateSource: 'statement' | 'none';
   daysOverdue: number;
   bucket: AgingBucket;
   /** Ids of the payment entries that were applied to this invoice. */
@@ -269,6 +273,8 @@ export type ActionCategory =
   | 'unappliedPayment'
   | 'periodGap'
   | 'missingOpening'
+  | 'openingMismatch'
+  | 'openingVerified'
   | 'balanceAgreed';
 
 /** A concrete next step, addressed to a named party. */
@@ -299,9 +305,23 @@ export interface ReconciliationSettings extends MatchSettings {
    * are compared on the same basis: what is genuinely still owed.
    */
   openItemsOnly: boolean;
-  /** Payment terms in days when a line carries no vade of its own. */
-  termDays: number;
-  /** The date ageing is measured from. ISO. */
+  /**
+   * The window the two ledgers are compared in, when the user names one.
+   *
+   * Mutabakat is almost always asked for over a stated period — the year to
+   * date, or two or three years of it — and the extracts either side sends
+   * rarely line up with that exactly. Naming the window makes the answer
+   * reproducible: everything outside it is set aside as out of period rather
+   * than reported as a missing record.
+   */
+  requestedPeriod: Period | null;
+  /**
+   * The date the two sides want to agree a balance at. ISO.
+   *
+   * Distinct from the end of `requestedPeriod`: an extract may run to
+   * 05.08.2026 while the balance being signed off is the one at 30.06.2026.
+   * Lines after this date are reported separately and never enter the balance.
+   */
   asOfDate: string;
 }
 

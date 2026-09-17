@@ -472,3 +472,84 @@ tr.emphasis:hover td { background: var(--surface-3); }
 .kv .k { color: var(--text-muted); }
 
 .empty { padding: 28px; text-align: center; color: var(--text-faint); font-size: 14px; }
+
+/* --- Questions the app must ask before it calculates ---------------------- */
+
+/*
+ * A question is not a label. These read as questions because getting them
+ * wrong does not produce a small error -- it produces a confident wrong
+ * answer, which is worse than no answer at all.
+ */
+.ask {
+  font-weight: 700;
+  color: var(--text);
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.ask-block {
+  padding: 12px 14px;
+}
+
+.sheet-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sheet-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  align-items: flex-start;
+  padding: 8px 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.sheet-choice:hover {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.seg.presets button {
+  font-size: 0.85rem;
+}
+
+details.advanced > summary {
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  padding: 4px 0;
+}
+
+.setup-tabs {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+.setup-tabs button[aria-pressed='true'] {
+  background: var(--surface-3);
+  color: var(--text);
+  font-weight: 550;
+}
+
+/* A count of questions still waiting, sitting on the tab that holds them. */
+.badge-dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: var(--bad);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+}

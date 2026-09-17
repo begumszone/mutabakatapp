@@ -1,7 +1,7 @@
 import type { AgingBucket, AllocationResult, OpenInvoice, StatementEntry } from '../types';
 import { claimOf } from './claim';
 import { normalizeDocNo, normalizeDocNoLoose } from './normalize';
-import { addDays, daysBetween } from './parseDate';
+import { daysBetween } from './parseDate';
 import { round2 } from './parseNumber';
 import type { Perspective } from '../types';
 
@@ -58,15 +58,14 @@ function referencedInvoiceKeys(entry: StatementEntry): string[] {
  * first, then oldest invoice first, which is both the legal default and what
  * the two accounting departments will assume when they talk.
  *
- * The due date comes from the statement's own vade column when it has one,
- * and otherwise from the invoice date plus the agreed term, and every
- * invoice records which of the two it used so nobody has to guess whether a
- * "45 days overdue" came from the file or from a setting.
+ * The due date comes from the statement's own vade column, and from nowhere
+ * else. An invoice whose statement states no vade is reported as not due:
+ * deriving one from a default term would put "59 gün gecikmiş" next to an
+ * invoice on which the two firms never agreed a term at all.
  */
 export function allocatePayments(
   entries: StatementEntry[],
   perspective: Perspective,
-  termDays: number,
   asOfDate: string,
 ): AllocationResult {
   const invoices: Invoice[] = [];
@@ -126,8 +125,8 @@ export function allocatePayments(
   }
 
   const open: OpenInvoice[] = invoices.map((invoice) => {
-    const dueDate = invoice.entry.dueDate ?? addDays(invoice.entry.date, termDays);
-    const daysOverdue = daysBetween(dueDate, asOfDate);
+    const dueDate = invoice.entry.dueDate;
+    const daysOverdue = dueDate === null ? 0 : daysBetween(dueDate, asOfDate);
     const remaining = round2(invoice.amount - invoice.paid);
     return {
       entry: invoice.entry,
@@ -135,7 +134,7 @@ export function allocatePayments(
       paid: invoice.paid,
       open: remaining,
       dueDate,
-      dueDateSource: invoice.entry.dueDate ? 'statement' : 'term',
+      dueDateSource: dueDate === null ? 'none' : 'statement',
       // An invoice that is settled is not overdue, however late the payment was.
       daysOverdue: remaining > 0 ? Math.max(0, daysOverdue) : 0,
       bucket: remaining > 0 ? bucketFor(daysOverdue) : 'notDue',

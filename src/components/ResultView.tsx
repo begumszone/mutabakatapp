@@ -8,6 +8,15 @@ interface Props {
   locale: Locale;
   result: PairReconciliation;
   onRestart: () => void;
+  /**
+   * Back to the setup, with everything still set up.
+   *
+   * Separate from `onRestart` on purpose. Adjusting a date or a column and
+   * looking again is the normal loop; making the only way back a full reset
+   * meant every adjustment cost re-uploading both files and re-mapping every
+   * column, so people stopped adjusting.
+   */
+  onBack: () => void;
 }
 
 const BUCKETS: AgingBucket[] = ['notDue', 'd1to30', 'd31to60', 'd61to90', 'd90plus'];
@@ -31,12 +40,27 @@ function claimClass(value: number): string {
   return value < -0.005 ? 'neg' : '';
 }
 
-export function ResultView({ locale, result, onRestart }: Props) {
+export function ResultView({ locale, result, onRestart, onBack }: Props) {
   const t = (key: string, vars?: Record<string, string | number>) =>
     translate(locale, key, vars);
   const { bridge, match, allocation, actions, creditor, debtor, currency } = result;
   const [tab, setTab] = useState<Tab>('actions');
   const money = (value: number) => formatMoney(value, locale, currency);
+
+  /**
+   * The date the devir is stated as of: the day before the window opens.
+   *
+   * A devir is always "as at 31.12.2025", never "as at 01.01.2026", and
+   * showing it undated is how a reconciliation ends up comparing two openings
+   * that were struck on different days.
+   */
+  const openingDate = useMemo(() => {
+    const start = result.period.common?.start;
+    if (!start) return null;
+    const day = new Date(`${start}T00:00:00Z`);
+    day.setUTCDate(day.getUTCDate() - 1);
+    return day.toISOString().slice(0, 10);
+  }, [result.period.common]);
 
   const mismatches = useMemo(
     () => match.pairs.filter((pair) => Math.abs(pair.amountDifference) >= 0.01),
@@ -134,6 +158,9 @@ export function ResultView({ locale, result, onRestart }: Props) {
         <button className="primary" onClick={download} type="button">
           {t('result.export')}
         </button>
+        <button className="ghost" onClick={onBack} type="button">
+          {t('result.back')}
+        </button>
         <button className="ghost" onClick={onRestart} type="button">
           {t('result.restart')}
         </button>
@@ -194,14 +221,19 @@ export function ResultView({ locale, result, onRestart }: Props) {
           </thead>
           <tbody>
             {bridgeRow(
-              t('result.balanceToday'),
+              // The row people sign is the balance at a stated date, not
+              // "today". Naming the date on the row is what makes the table
+              // mean the same thing a month later.
+              t('result.balanceAt', { date: formatDate(result.asOfDate, locale) }),
               bridge.creditorBalance,
               bridge.debtorBalance,
               bridge.difference,
               t('result.balanceDiff'),
             )}
             {bridgeRow(
-              t('result.opening'),
+              openingDate
+                ? t('result.openingAt', { date: formatDate(openingDate, locale) })
+                : t('result.opening'),
               bridge.creditorOpening,
               bridge.debtorOpening,
               bridge.openingDifference,
@@ -299,8 +331,7 @@ export function ResultView({ locale, result, onRestart }: Props) {
                       <td>{formatDate(invoice.entry.date, locale)}</td>
                       <td className="num">{invoice.entry.docNo || '—'}</td>
                       <td>
-                        {formatDate(invoice.dueDate, locale)}
-                        {invoice.dueDateSource === 'term' && <span className="faint"> *</span>}
+                        {invoice.dueDate === null ? '—' : formatDate(invoice.dueDate, locale)}
                       </td>
                       <td className="n num">{money(invoice.amount)}</td>
                       <td className="n num">{money(invoice.open)}</td>

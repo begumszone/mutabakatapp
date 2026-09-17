@@ -247,7 +247,7 @@ export async function exportReconciliation(
     const row = aging.addRow([
       invoice.entry.docNo,
       formatDate(invoice.entry.date, locale),
-      formatDate(invoice.dueDate, locale),
+      invoice.dueDate === null ? '—' : formatDate(invoice.dueDate, locale),
       invoice.amount,
       invoice.paid,
       invoice.open,

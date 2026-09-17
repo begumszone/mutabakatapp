@@ -52,7 +52,7 @@ const settings: ReconciliationSettings = {
   dayTolerance: 7,
   allowDateAmountFallback: true,
   openItemsOnly: false,
-  termDays: 30,
+  requestedPeriod: null,
   asOfDate: '2026-06-30',
 };
 

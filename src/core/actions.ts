@@ -109,6 +109,18 @@ export interface ActionInput {
  * stated plainly at the top instead of leaving the reader to infer it from
  * an empty list.
  */
+/** The day before an ISO date -- when a devir is struck, relative to a window. */
+function dayBefore(iso: string): string {
+  const day = new Date(`${iso}T00:00:00Z`);
+  day.setUTCDate(day.getUTCDate() - 1);
+  return day.toISOString().slice(0, 10);
+}
+
+/** True for 31 December, the date a devir normally carries. */
+function isYearEnd(iso: string): boolean {
+  return iso.slice(5) === '12-31';
+}
+
 export function buildActions(input: ActionInput): RecommendedAction[] {
   const { creditor, debtor, match, bridge, allocation, materiality, period } = input;
   const actions: RecommendedAction[] = [];
@@ -133,6 +145,53 @@ export function buildActions(input: ActionInput): RecommendedAction[] {
         creditor: creditor.name,
         debtor: debtor.name,
       },
+      entryIds: [],
+    });
+  }
+
+  /*
+   * The devir check, run on every reconciliation and never skipped at a year
+   * end.
+   *
+   * `periodGap` above only fires when the two statements start on different
+   * days. Two statements that start on the same day can still carry different
+   * devir figures, and when they do, nothing inside the window will ever
+   * explain it: the disagreement was inherited. Closing a year on top of an
+   * unagreed devir carries the error into the next year, where it is harder
+   * to find, so this is raised at full severity and stated with both figures.
+   */
+  const openingDate = period.common ? dayBefore(period.common.start) : null;
+  const openingsDiffer = Math.abs(period.openingDifference) > materiality;
+  if (!period.shortSide && openingsDiffer) {
+    actions.push({
+      id: 'opening-mismatch',
+      severity: 'critical',
+      category: 'openingMismatch',
+      ownerPartyId: creditor.id,
+      amount: period.openingDifference,
+      messageKey: 'action.openingMismatch',
+      messageVars: {
+        date: openingDate ?? '',
+        creditor: creditor.name,
+        debtor: debtor.name,
+        creditorOpening: period.creditorOpening,
+        debtorOpening: period.debtorOpening,
+        difference: period.openingDifference,
+      },
+      entryIds: [],
+    });
+  } else if (openingDate !== null && isYearEnd(openingDate) && !openingsDiffer) {
+    // Saying so is the point. A devir that agrees is a result, and the person
+    // signing the mutabakat mektubu needs it on the page, not inferred from
+    // the absence of a warning.
+    actions.push({
+      id: 'opening-verified',
+      severity: 'info',
+      category: 'openingVerified',
+      ownerPartyId: creditor.id,
+      amount: period.creditorOpening,
+      messageKey: 'action.openingVerified',
+      messageVars: { date: openingDate, amount: period.creditorOpening },
       entryIds: [],
     });
   }
@@ -239,7 +298,7 @@ export function buildActions(input: ActionInput): RecommendedAction[] {
         messageVars: {
           docNo: invoice.entry.docNo,
           days: invoice.daysOverdue,
-          dueDate: invoice.dueDate,
+          dueDate: invoice.dueDate ?? '',
           debtor: debtor.name,
         },
         entryIds: [invoice.entry.id],

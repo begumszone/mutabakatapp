@@ -47,7 +47,17 @@ export function comparisonWindow(
   debtorStatement: Statement,
   creditorPeriod: Period | null,
   debtorPeriod: Period | null,
+  /**
+   * The window the user asked for, when they named one.
+   *
+   * It wins outright. Inferring the window from the files is a fallback for
+   * when nobody has said which period is being reconciled; once somebody has,
+   * guessing against them would silently reconcile a different period than
+   * the one that gets signed.
+   */
+  requested: Period | null = null,
 ): Period | null {
+  if (requested) return requested;
   if (!creditorPeriod) return debtorPeriod;
   if (!debtorPeriod) return creditorPeriod;
 
@@ -165,6 +175,7 @@ export function alignPeriods(
    * strength of it would send the user chasing a document they do not need.
    */
   compareOpenings = true,
+  requested: Period | null = null,
 ): { alignment: PeriodAlignment; creditor: PeriodSplit; debtor: PeriodSplit } {
   const creditorPeriod = periodOf(creditorStatement);
   const debtorPeriod = periodOf(debtorStatement);
@@ -173,6 +184,7 @@ export function alignPeriods(
     debtorStatement,
     creditorPeriod,
     debtorPeriod,
+    requested,
   );
 
   const creditor = splitAtPeriod(creditorStatement, common);
@@ -197,6 +209,7 @@ export function alignPeriods(
   }
 
   const misaligned =
+    requested === null &&
     creditorPeriod !== null &&
     debtorPeriod !== null &&
     (creditorPeriod.start !== debtorPeriod.start || creditorPeriod.end !== debtorPeriod.end);

@@ -2,6 +2,7 @@ import type { AmountLayout, ColumnMapping, MappingIssue, ParsedFile, RawRow } fr
 import { foldText } from '../core/normalize';
 import { parseAmount } from '../core/parseNumber';
 import { parseDate } from '../core/parseDate';
+import { inferColumns, looksHeaderless } from './inferColumns';
 
 interface Candidate {
   /** Substring to look for in the folded header. */
@@ -251,6 +252,12 @@ function hasBothSigns(rows: RawRow[], header: string | null): boolean {
  */
 export function suggestMapping(file: ParsedFile): ColumnMapping {
   const { headers, rows } = file;
+
+  // A sheet that never named its columns cannot be read by header wording.
+  // What the data itself says is read instead -- including which money column
+  // is a running balance, which is the one mistake that must never be made
+  // silently.
+  if (looksHeaderless(file)) return inferColumns(file).mapping;
 
   const pickChecked = (field: string, test: (header: string) => boolean): string | null => {
     for (const header of rank(headers, FIELDS[field])) {

@@ -2,6 +2,7 @@ import type { ColumnMapping, Locale, ParsedFile, ParsedWorkbook, Perspective } f
 import { translate } from '../lib/i18n';
 import { validateMapping } from '../adapters/suggestMapping';
 import type { BuildResult } from '../adapters/buildStatement';
+import type { InferredColumns } from '../adapters/inferColumns';
 import { FileDrop } from './FileDrop';
 
 /** One sheet of one uploaded file, mapped into ledger lines. */
@@ -14,6 +15,8 @@ export interface SourceView {
   mapping: ColumnMapping;
   perspective: Perspective;
   build: BuildResult;
+  sheetConfirmed: boolean;
+  columnHints: InferredColumns | null;
 }
 
 interface Props {
@@ -100,6 +103,48 @@ function SourceCard({
       </div>
 
       <div className="source-body stack">
+        {source.workbook && source.workbook.sheets.length > 1 && !source.sheetConfirmed && (
+          <div className="notice ask-block">
+            <div className="ask">
+              {t('mapping.whichSheet', { count: source.workbook.sheets.length })}
+            </div>
+            <p className="small" style={{ margin: '4px 0 8px' }}>{t('mapping.whichSheetHint')}</p>
+            <div className="sheet-choices">
+              {source.workbook.sheets.map((sheet, index) => (
+                <button
+                  key={sheet.name}
+                  type="button"
+                  className="sheet-choice"
+                  onClick={() => onSheetIndex(index)}
+                >
+                  <strong>{sheet.name}</strong>
+                  <span className="faint small">
+                    {t('mapping.sheetRows', { count: sheet.grid.length })}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {source.columnHints && source.columnHints.ambiguousMoneyColumns.length > 0 && (
+          <div className="notice error ask-block">
+            <div className="ask">{t('mapping.whichMoney')}</div>
+            <p className="small" style={{ margin: '4px 0 0' }}>
+              {t('mapping.whichMoneyHint', {
+                columns: source.columnHints.ambiguousMoneyColumns.join(', '),
+              })}
+            </p>
+            {source.columnHints.balanceColumns.length > 0 && (
+              <p className="small" style={{ margin: '6px 0 0' }}>
+                {t('mapping.balanceColumns', {
+                  columns: source.columnHints.balanceColumns.join(', '),
+                })}
+              </p>
+            )}
+          </div>
+        )}
+
         <div className="row">
           {source.workbook && source.workbook.sheets.length > 1 && (
             <label className="field">

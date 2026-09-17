@@ -52,7 +52,7 @@ const settings: ReconciliationSettings = {
   dayTolerance: 7,
   allowDateAmountFallback: true,
   openItemsOnly: false,
-  termDays: 30,
+  requestedPeriod: null,
   asOfDate: '2026-08-31',
 };
 
@@ -324,14 +324,18 @@ describe('payment allocation and ageing', () => {
     expect(overdue?.severity).toBe('critical');
   });
 
-  it('derives a vade from the agreed term when the file carries none', () => {
+  it('leaves an invoice with no vade undated rather than inventing one', () => {
+    // There used to be a "payment term (days)" setting that filled this gap.
+    // It meant the app could report "59 gün gecikmiş" on an invoice whose two
+    // firms had never agreed a term -- a figure with nothing behind it.
     const creditor = statement('a', 'receivable', [entry('c1', '2026-08-15', 'FTR2026000101', 10000, 0)]);
     const debtor = statement('b', 'payable', [entry('d1', '2026-08-15', 'FTR2026000101', 0, 10000)]);
     const result = reconcilePair(abc, begum, creditor, debtor, settings);
     const invoice = result.allocation.invoices[0];
-    expect(invoice.dueDateSource).toBe('term');
-    expect(invoice.dueDate).toBe('2026-09-14');
+    expect(invoice.dueDateSource).toBe('none');
+    expect(invoice.dueDate).toBeNull();
     expect(invoice.daysOverdue).toBe(0);
+    expect(result.actions.some((a) => a.category === 'overdue')).toBe(false);
   });
 });
 
@@ -344,5 +348,74 @@ describe('presentation of figures that cancel', () => {
     expect(formatMoney(round2(0.0001 - 0.0002), 'tr')).toBe('0,00');
     // A real small amount still shows its sign.
     expect(formatMoney(-0.01, 'tr')).toBe('-0,01');
+  });
+});
+
+describe('the devir check', () => {
+  const settings: ReconciliationSettings = {
+    amountTolerance: 0.01,
+    dayTolerance: 7,
+    allowDateAmountFallback: true,
+    openItemsOnly: false,
+    requestedPeriod: null,
+    asOfDate: '2026-06-30',
+  };
+
+  it('raises the opening gap even when both statements start on the same day', () => {
+    // periodGap only fires when one side's statement starts later. Two
+    // statements that start together can still carry different devir figures,
+    // and nothing inside the window will ever explain that.
+    const creditor = statement('a', 'receivable', [
+      entry('c0', '2026-01-01', '', 100000, 0, { docType: 'opening' }),
+      entry('c1', '2026-02-01', 'FT-1', 5000, 0),
+    ]);
+    const debtor = statement('b', 'payable', [
+      entry('d0', '2026-01-01', '', 0, 90000, { docType: 'opening' }),
+      entry('d1', '2026-02-01', 'FT-1', 0, 5000),
+    ]);
+    const result = reconcilePair(abc, begum, creditor, debtor, settings);
+    const action = result.actions.find((a) => a.category === 'openingMismatch');
+    expect(action).toBeDefined();
+    expect(action?.severity).toBe('critical');
+    expect(action?.amount).toBe(10000);
+    expect(action?.messageVars.date).toBe('2025-12-31');
+  });
+
+  it('says so when the year-end devir agrees, rather than staying silent', () => {
+    const creditor = statement('a', 'receivable', [
+      entry('c0', '2026-01-01', '', 100000, 0, { docType: 'opening' }),
+      entry('c1', '2026-02-01', 'FT-1', 5000, 0),
+    ]);
+    const debtor = statement('b', 'payable', [
+      entry('d0', '2026-01-01', '', 0, 100000, { docType: 'opening' }),
+      entry('d1', '2026-02-01', 'FT-1', 0, 5000),
+    ]);
+    const result = reconcilePair(abc, begum, creditor, debtor, settings);
+    const verified = result.actions.find((a) => a.category === 'openingVerified');
+    expect(verified?.messageVars.date).toBe('2025-12-31');
+    expect(verified?.amount).toBe(100000);
+    expect(result.actions.some((a) => a.category === 'openingMismatch')).toBe(false);
+  });
+});
+
+describe('a window the user asked for', () => {
+  it('sets aside what falls outside it instead of calling it missing', () => {
+    const creditor = statement('a', 'receivable', [
+      entry('c1', '2026-03-01', 'FT-1', 5000, 0),
+      entry('c2', '2026-08-05', 'FT-2', 7000, 0),
+    ]);
+    const debtor = statement('b', 'payable', [entry('d1', '2026-03-01', 'FT-1', 0, 5000)]);
+    const result = reconcilePair(abc, begum, creditor, debtor, {
+      amountTolerance: 0.01,
+      dayTolerance: 7,
+      allowDateAmountFallback: true,
+      openItemsOnly: false,
+      requestedPeriod: { start: '2026-01-01', end: '2026-06-30' },
+      asOfDate: '2026-06-30',
+    });
+    expect(result.period.common).toEqual({ start: '2026-01-01', end: '2026-06-30' });
+    // The August invoice is out of period, not a record the other side missed.
+    expect(result.match.creditorOnly).toHaveLength(0);
+    expect(result.bridge.agreed).toBe(true);
   });
 });

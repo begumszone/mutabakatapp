@@ -18,7 +18,7 @@ export const DEFAULT_SETTINGS: ReconciliationSettings = {
   dayTolerance: 7,
   allowDateAmountFallback: true,
   openItemsOnly: false,
-  termDays: 30,
+  requestedPeriod: null,
   asOfDate: '',
 };
 
@@ -62,6 +62,7 @@ export function reconcilePair(
     debtorStatement,
     settings.amountTolerance,
     !settings.openItemsOnly,
+    settings.requestedPeriod,
   );
   const creditorInPeriod: Statement = { ...creditorStatement, entries: creditorSplit.inside };
   const debtorInPeriod: Statement = { ...debtorStatement, entries: debtorSplit.inside };
@@ -92,7 +93,6 @@ export function reconcilePair(
   const allocation = allocatePayments(
     view.creditorStatement.entries,
     view.creditorStatement.perspective,
-    settings.termDays,
     settings.asOfDate,
   );
 
